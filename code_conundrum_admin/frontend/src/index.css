@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    @apply transition-colors duration-200;
+  }
+}
+
+@layer components {
+  .panel {
+    @apply bg-[#0a1428]/80 border border-cyan-400/30 rounded-xl p-4 md:p-8 mb-5 md:mb-8 backdrop-blur hover:border-cyan-400/60 transition-all duration-300;
+  }
+
+  .panel-title {
+    @apply text-lg md:text-xl mb-4 md:mb-6 flex items-center gap-2 md:gap-3 text-cyan-300 font-bold;
+  }
+
+  .input {
+    @apply w-full mb-4 px-4 py-3 rounded bg-black/50 border border-cyan-400/30 text-white font-mono placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 transition-all;
+  }
+
+  .btn {
+    @apply px-4 md:px-5 py-2 text-[11px] md:text-xs font-bold rounded border transition-all duration-200 hover:shadow-lg;
+  }
+
+  .btn-cyan {
+    @apply border-cyan-400 text-cyan-400 hover:bg-cyan-400 hover:text-black hover:shadow-cyan-400/30;
+  }
+
+  .btn-green {
+    @apply border-green-400 text-green-400 hover:bg-green-400 hover:text-black hover:shadow-green-400/30;
+  }
+
+  .btn-orange {
+    @apply border-orange-400 text-orange-400 hover:bg-orange-400 hover:text-black hover:shadow-orange-400/30;
+  }
+
+  .btn-danger {
+    @apply border-red-400 text-red-400 hover:bg-red-400 hover:text-black hover:shadow-red-400/30;
+  }
+
+  /* Loading animation */
+  @keyframes pulse-glow {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 10px rgba(34, 211, 238, 0.3);
+    }
+    50% {
+      opacity: 0.8;
+      box-shadow: 0 0 20px rgba(34, 211, 238, 0.6);
+    }
+  }
+
+  .animate-pulse-glow {
+    @apply animate-pulse;
+    box-shadow: 0 0 10px rgba(34, 211, 238, 0.3);
+  }
+
+  /* Status badge animations */
+  @keyframes blink {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  .animate-status-live {
+    @apply animate-pulse;
+  }
+
+  /* Gradient text */
+  .text-gradient {
+    @apply bg-gradient-to-r from-cyan-400 to-sky-500 bg-clip-text text-transparent;
+  }
+
+  /* Card hover effect */
+  .card-hover {
+    @apply hover:shadow-xl hover:shadow-cyan-400/20 hover:-translate-y-1 transition-all duration-300;
+  }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  @apply w-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-black/30;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-cyan-400/40 rounded hover:bg-cyan-400/60;
+}
