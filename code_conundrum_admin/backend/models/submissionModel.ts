@@ -4,12 +4,13 @@ export interface IAnswerSubmission{
     questionId:Types.ObjectId;
     selectedAnswer:Types.ObjectId;
 }
+
 export interface ISubmission{
     teamId:Types.ObjectId;
     roundId:Types.ObjectId;
     answers:IAnswerSubmission[];
-    score:number;
     timeTaken:number;
+    questionsSolved:number;
     submittedAt:Date;
     isInvalidated:boolean;
     createdAt:Date;
@@ -48,13 +49,14 @@ const submissionSchema=new Schema<ISubmission>({
       type: [answerSubSchema],
       required: true,
     },
-    score: {
-      type: Number,
-      default: 0,
-    },
     timeTaken: {
       type: Number,
       default: 0,
+    },
+    questionsSolved: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
     submittedAt: {
       type: Date,
@@ -67,5 +69,7 @@ const submissionSchema=new Schema<ISubmission>({
 },{timestamps:true});
 
 submissionSchema.index({teamId:1,roundId:1},{unique:true});
+// Leaderboard priority: lower timeTaken first, then higher questionsSolved.
+submissionSchema.index({ roundId: 1, isInvalidated: 1, timeTaken: 1, questionsSolved: -1 });
 
 export const Submission=mongoose.model<ISubmission>("Submission",submissionSchema);

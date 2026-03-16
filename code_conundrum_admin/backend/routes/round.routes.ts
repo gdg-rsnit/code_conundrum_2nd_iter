@@ -3,7 +3,7 @@ import { authenticate, authorizeAdmin } from "../middlewares/auth.middleware.js"
 import { 
     createRound, 
     getRounds, 
-    getRountById, 
+    getRoundById, 
     updateRound, 
     startRound, 
     pauseAndResume, 
@@ -18,7 +18,7 @@ const router = express.Router();
 // CRUD operations
 router.route("/").post(authenticate, authorizeAdmin, createRound).get(authenticate, authorizeAdmin, getRounds);
 router.route("/:roundId")
-    .get(authenticate, authorizeAdmin, getRountById)
+    .get(authenticate, authorizeAdmin, getRoundById)
     .patch(authenticate, authorizeAdmin, updateRound)
     .delete(authenticate, authorizeAdmin, deleteRound);
 

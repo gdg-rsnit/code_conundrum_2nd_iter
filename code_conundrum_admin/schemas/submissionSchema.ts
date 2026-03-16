@@ -19,10 +19,12 @@ export const createSubmissionSchema = z.object({
     .array(answerSubmissionSchema)
     .min(1, "At least one answer required"),
   timeTaken: z.number().int().nonnegative().optional(),
+  questionsSolved: z.number().int().nonnegative().optional(),
 });
 
 export const updateSubmissionSchema = z.object({
-  score: z.number().nonnegative().optional(),
+  timeTaken: z.number().int().nonnegative().optional(),
+  questionsSolved: z.number().int().nonnegative().optional(),
   isInvalidated: z.boolean().optional(),
 });
 

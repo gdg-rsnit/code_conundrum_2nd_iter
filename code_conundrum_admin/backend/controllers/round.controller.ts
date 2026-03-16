@@ -38,7 +38,7 @@ const getRounds = asyncHandler(async (req: Request, res: Response) => {
     return res.status(200).json({data:rounds,success:true,message:"successfully retrieved rounds"})
 })
 
-const getRountById=asyncHandler(async(req:Request,res:Response)=>{
+const getRoundById=asyncHandler(async(req:Request,res:Response)=>{
     const {roundId}=req.params;
     const round=await Round.findById(roundId);
     if(!round){
@@ -119,9 +119,13 @@ const startRound=asyncHandler(async(req:Request,res:Response)=>{
 })
 
 const pauseAndResume=asyncHandler(async(req:Request,res:Response)=>{
-    const {id}=req.params;
+    const roundId = req.params.roundId;
+
+    if (!roundId) {
+        return res.status(400).json({ success: false, message: "roundId is required" });
+    }
     
-    const round=await Round.findById(id);
+    const round=await Round.findById(roundId);
     
     if(!round){
         return res.status(404).json({success:false,message:"round not found"})
@@ -214,44 +218,35 @@ const extendRound = asyncHandler(async (req: Request, res: Response) => {
 const deleteRound = asyncHandler(async (req: Request, res: Response) => {
     const { roundId } = req.params;
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    const round = await Round.findById(roundId);
 
-    try {
-        const round = await Round.findById(roundId).session(session);
-
-        if (!round) {
-            throw new Error("Round not found");
-        }
-
-        if (round.status === "LIVE") {
-            throw new Error("Cannot delete LIVE round");
-        }
-
-        await Question.deleteMany({ round: roundId }).session(session);
-        await Submission.deleteMany({ round: roundId }).session(session);
-        await Penalty.deleteMany({ round: roundId }).session(session);
-        await Answer.deleteMany({ round: roundId }).session(session);
-
-        await Round.findByIdAndDelete(roundId).session(session);
-
-        await session.commitTransaction();
-        session.endSession();
-
-        return res.status(200).json({
-            success: true,
-            message: "Round deleted successfully"
-        });
-
-    } catch (error: any) {
-        await session.abortTransaction();
-        session.endSession();
-
-        return res.status(400).json({
+    if (!round) {
+        return res.status(404).json({
             success: false,
-            message: error.message
+            message: "Round not found"
         });
     }
+
+    if (round.status === "LIVE") {
+        return res.status(400).json({
+            success: false,
+            message: "Cannot delete LIVE round"
+        });
+    }
+
+    const roundObjectId = new mongoose.Types.ObjectId(roundId);
+
+    // Delete all related data 
+    await Question.deleteMany({ roundId: roundObjectId });
+    await Submission.deleteMany({ roundId: roundObjectId });
+    await Penalty.deleteMany({ roundId: roundObjectId });
+    await Answer.deleteMany({ roundId: roundObjectId });
+    await Round.findByIdAndDelete(roundId);
+
+    return res.status(200).json({
+        success: true,
+        message: "Round deleted successfully"
+    });
 });
 
 const endRound = asyncHandler(async (req: Request, res: Response) => {
@@ -284,7 +279,11 @@ const endRound = asyncHandler(async (req: Request, res: Response) => {
     });
 });
 const resetRound = asyncHandler(async (req: Request, res: Response) => {
-    const { roundId } = req.params;
+    const roundId = req.params.roundId;
+
+    if (!roundId) {
+        return res.status(400).json({ success: false, message: "roundId is required" });
+    }
 
     const round = await Round.findById(roundId);
 
@@ -299,15 +298,16 @@ const resetRound = asyncHandler(async (req: Request, res: Response) => {
         });
     }
 
-    await Submission.deleteMany({ round: roundId });
-    await Penalty.deleteMany({ round: roundId });
+    await Submission.deleteMany({ roundId });
+    await Penalty.deleteMany({ roundId });
 
     round.status = "DRAFT";
     round.startTime = null;
     round.endTime = null;
     round.isPaused = false;
     round.pauseStartAt = null;
-
+    round.submissionLocked=false;
+    
     await round.save();
 
     return res.status(200).json({
@@ -319,7 +319,7 @@ const resetRound = asyncHandler(async (req: Request, res: Response) => {
 export { 
     createRound, 
     getRounds, 
-    getRountById, 
+    getRoundById, 
     updateRound, 
     startRound, 
     pauseAndResume, 

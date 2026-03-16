@@ -14,22 +14,41 @@ import api from '../lib/axios.js';
 
 
 export const loginRequest = async (credentials: LoginRequest): Promise<LoginResponse> => {
-  const validatedCredentials = loginUserSchema.parse(credentials);
-  const { data } = await api.post('/users/auth', validatedCredentials);
-  return loginResponseSchema.parse(data);
+  const inputValidation = loginUserSchema.safeParse(credentials);
+  if (!inputValidation.success) {
+    throw inputValidation.error;
+  }
+  const { data } = await api.post('/users/auth', inputValidation.data);
+  const responseValidation = loginResponseSchema.safeParse(data);
+  if (!responseValidation.success) {
+    throw responseValidation.error;
+  }
+  return responseValidation.data;
 };
 
 export const logoutRequest = async (): Promise<LogoutResponse> => {
   const { data } = await api.post('/users/logout');
-  return logoutResponseSchema.parse(data);
+  const validation = logoutResponseSchema.safeParse(data);
+  if (!validation.success) {
+    throw validation.error;
+  }
+  return validation.data;
 };
 
 export const getAllUsersRequest = async (): Promise<GetAllUsersResponse> => {
   const { data } = await api.get("/users");
-  return getAllUsersResponseSchema.parse(data);
+  const validation = getAllUsersResponseSchema.safeParse(data);
+  if (!validation.success) {
+    throw validation.error;
+  }
+  return validation.data;
 };
 
 export const deleteUserRequest = async (id: string): Promise<DeleteUserResponse> => {
   const { data } = await api.delete(`/users/${id}`);
-  return deleteUserResponseSchema.parse(data);
+  const validation = deleteUserResponseSchema.safeParse(data);
+  if (!validation.success) {
+    throw validation.error;
+  }
+  return validation.data;
 };

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { useLogin } from "../hooks/authHook";
 
@@ -7,7 +8,6 @@ export default function LoginPage() {
   const [mode, setMode] = useState("ADMIN");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
 
   const { setUser } = useAuth();
   const navigate = useNavigate();
@@ -18,7 +18,8 @@ export default function LoginPage() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setError("");
+
+    const loadingToast = toast.loading("Logging in...");
 
     try {
       const response = await loginMutation.mutateAsync({ email, password });
@@ -36,8 +37,16 @@ export default function LoginPage() {
         throw new Error("Use Admin mode for this account");
       }
 
+      // Store user with expiry timestamp (3 hours to match backend JWT)
+      const authData = {
+        user: loggedInUser,
+        expiresAt: Date.now() + (3 * 60 * 60 * 1000) // 3 hours in milliseconds
+      };
+      
       setUser(loggedInUser);
-      localStorage.setItem("cc_auth_user", JSON.stringify(loggedInUser));
+      localStorage.setItem("cc_auth_user", JSON.stringify(authData));
+
+      toast.success(`Welcome back, ${loggedInUser.email}!`, { id: loadingToast });
 
       if (loggedInUser.role === "ADMIN") {
         navigate(from && from !== "/login" ? from : "/rounds", { replace: true });
@@ -45,7 +54,7 @@ export default function LoginPage() {
         navigate("/user", { replace: true });
       }
     } catch (err) {
-      setError(err.message || "Unable to login");
+      toast.error(err.message || "Unable to login. Please try again.", { id: loadingToast });
     }
   };
 
@@ -89,8 +98,6 @@ export default function LoginPage() {
             onChange={(event) => setPassword(event.target.value)}
             required
           />
-
-          {error ? <p className="text-xs text-red-400">{error}</p> : null}
 
           <button type="submit" className="w-full btn btn-cyan" disabled={loginMutation.isPending}>
             {loginMutation.isPending ? "Logging in..." : `Login as ${mode === "ADMIN" ? "Admin" : "User"}`}

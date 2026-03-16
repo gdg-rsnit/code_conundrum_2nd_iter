@@ -1,11 +1,9 @@
 import * as z from "zod";
-import mongoose from "mongoose";
 
+// ObjectId validation compatible with both frontend and backend
 const objectIdSchema = z
   .string()
-  .refine((val) => mongoose.Types.ObjectId.isValid(val), {
-    message: "Invalid ObjectId",
-  });
+  .regex(/^[0-9a-fA-F]{24}$/, "Invalid ObjectId");
 
 export const createPenaltySchema = z.object({
   teamId: objectIdSchema,
@@ -27,5 +25,32 @@ export const updatePenaltySchema = z.object({
   reason: z.string().min(1, "Reason is required").optional(),
 });
 
+export const penaltyResponseSchema = z.object({
+  _id: z.string(),
+  teamId: objectIdSchema,
+  roundId: objectIdSchema,
+  timeDeducted: z.number(),
+  scoreDeducted: z.number(),
+  reason: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const penaltiesListResponseSchema = z.object({
+  data: z.array(penaltyResponseSchema),
+  success: z.boolean(),
+  message: z.string(),
+  count: z.number().optional(),
+});
+
+export const penaltyItemResponseSchema = z.object({
+  data: penaltyResponseSchema,
+  success: z.boolean(),
+  message: z.string(),
+});
+
 export type CreatePenaltyInput = z.infer<typeof createPenaltySchema>;
 export type UpdatePenaltyInput = z.infer<typeof updatePenaltySchema>;
+export type PenaltyResponse = z.infer<typeof penaltyResponseSchema>;
+export type PenaltiesListResponse = z.infer<typeof penaltiesListResponseSchema>;
+export type PenaltyItemResponse = z.infer<typeof penaltyItemResponseSchema>;

@@ -4,7 +4,6 @@ export interface IQuestion{
     roundId:Types.ObjectId;
     question:string;
     correctAnswerId:Types.ObjectId;
-    difficulty:"EASY"|"MEDIUM"|"HARD";
     createdAt:Date;
     updatedAt:Date;
 }
@@ -23,11 +22,6 @@ const questionSchema=new Schema<IQuestion>({
     correctAnswerId:{
         type:mongoose.Schema.Types.ObjectId,
         ref:"Answer",
-        required:true
-    },
-    difficulty:{
-        type:String,
-        enum:["EASY","MEDIUM","HARD"],
         required:true
     }
 },{timestamps:true});

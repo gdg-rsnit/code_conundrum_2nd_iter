@@ -7,8 +7,26 @@ const AuthContext = createContext(null);
 function getStoredUser() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    
+    const data = JSON.parse(raw);
+    
+    // Handle old format (direct user object) for backward compatibility
+    if (!data.expiresAt) {
+      // Old format detected, clear it
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+    
+    // Check if session has expired
+    if (Date.now() >= data.expiresAt) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+    
+    return data.user;
   } catch {
+    localStorage.removeItem(STORAGE_KEY);
     return null;
   }
 }
@@ -20,6 +38,9 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     try {
       await logoutMutation.mutateAsync();
+    } catch (error) {
+      // Even if logout API fails, clear local state
+      console.error('Logout API error:', error);
     } finally {
       setUser(null);
       localStorage.removeItem(STORAGE_KEY);

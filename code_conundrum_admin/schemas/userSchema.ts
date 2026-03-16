@@ -25,11 +25,10 @@ export const userSchema = z.object({
 
 export const getAllUsersResponseSchema = z.object({
   success: z.boolean(),
-  users: z.array(userSchema),
+  data: z.array(userSchema.omit({ password: true })),
 });
 
 export const deleteUserResponseSchema = z.object({
-  success: z.boolean(),
   message: z.string(),
 });
 

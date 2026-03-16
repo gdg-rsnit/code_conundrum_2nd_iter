@@ -33,7 +33,7 @@ export const useGetAllUsers = () => {
     staleTime: 5 * 60 * 1000, 
     gcTime: 10 * 60 * 1000, 
     retry: 1,
-    select: (data) => data.users,
+    select: (data) => data.data,
   });
 };
 

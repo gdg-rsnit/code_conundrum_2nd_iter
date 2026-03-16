@@ -26,5 +26,38 @@ export const updateTeamSchema = z.object({
   banned: z.boolean().optional(),
 });
 
+export const updateTeamStatusSchema = z.object({
+  banned: z.boolean(),
+});
+
+export const teamResponseSchema = z.object({
+  _id: z.string(),
+  teamName: z.string(),
+  teamMembers: z.array(z.string()),
+  banned: z.boolean(),
+  bannedAt: z.string().nullable(),
+  score: z.number(),
+  time: z.number(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+export const getTeamsResponseSchema = z.object({
+  data: z.array(teamResponseSchema),
+  success: z.boolean(),
+  message: z.string(),
+  count: z.number().optional(),
+});
+
+export const teamItemResponseSchema = z.object({
+  data: teamResponseSchema,
+  success: z.boolean(),
+  message: z.string(),
+});
+
 export type CreateTeamInput = z.infer<typeof createTeamSchema>;
 export type UpdateTeamInput = z.infer<typeof updateTeamSchema>;
+export type UpdateTeamStatusInput = z.infer<typeof updateTeamStatusSchema>;
+export type TeamResponse = z.infer<typeof teamResponseSchema>;
+export type GetTeamsResponse = z.infer<typeof getTeamsResponseSchema>;
+export type TeamItemResponse = z.infer<typeof teamItemResponseSchema>;

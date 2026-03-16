@@ -1,13 +1,20 @@
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
 
 export default function UserHomePage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
-    await logout();
-    navigate("/login");
+    const loadingToast = toast.loading("Logging out...");
+    try {
+      await logout();
+      toast.success("Logged out successfully!", { id: loadingToast });
+      navigate("/login");
+    } catch (error) {
+      toast.error("Failed to logout", { id: loadingToast });
+    }
   };
 
   return (
