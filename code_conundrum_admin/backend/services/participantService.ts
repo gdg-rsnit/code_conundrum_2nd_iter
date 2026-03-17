@@ -52,7 +52,7 @@ export const getParticipantsByRound = async (
 
   const participants = await Submission
     .find({ roundId: currentRound._id })
-    .sort({ questionsSolved: -1, timeSeconds: 1 })
+    .sort({ questionsSolved: -1, timeSeconds: 1, submittedAt: 1 })
     .limit(limit)
     .populate('teamId', 'teamName')
     .lean()

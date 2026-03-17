@@ -25,8 +25,30 @@ const ASTEROIDS = Array.from({ length: 8 }, () => ({
 const Countdown = () => {
   const navigate = useNavigate();
   const [count, setCount] = useState(10);
+  const [initialCount, setInitialCount] = useState(10);
   const [pulseStars, setPulseStars] = useState(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    const liveRoundRaw = localStorage.getItem('cc_live_round');
+    if (!liveRoundRaw) return;
+
+    try {
+      const liveRound = JSON.parse(liveRoundRaw);
+      const startAt = new Date(liveRound.startTime).getTime();
+      const remaining = Math.max(0, Math.ceil((startAt - Date.now()) / 1000));
+
+      if (remaining <= 0) {
+        navigate('/contest');
+        return;
+      }
+
+      setCount(remaining);
+      setInitialCount(remaining);
+    } catch {
+      // keep default countdown
+    }
+  }, [navigate]);
 
   // Enter fullscreen on mount, exit on unmount
   useEffect(() => {
@@ -93,7 +115,7 @@ const Countdown = () => {
     }
   }, [count, navigate]);
 
-  const progress = (count / 10) * 100;
+  const progress = (count / Math.max(1, initialCount)) * 100;
   const isWord = count <= 3;
   const displayLabel =
     count === 3 ? 'READY' :

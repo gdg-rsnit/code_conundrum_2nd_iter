@@ -1,14 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StarfieldBackground from '@/components/StarfieldBackground';
 import PixelRadar from '@/components/PixelRadar';
 import MarqueeStrip from '@/components/MarqueeStrip';
 import { X } from 'lucide-react';
 
+const API_URL = 'http://localhost:5000/api';
+
 const WaitingRoom = () => {
   const navigate = useNavigate();
   const [flashing, setFlashing] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
+  const hasNavigatedRef = useRef(false);
 
   useEffect(() => {
     const handleGlobalClick = (e: MouseEvent) => {
@@ -36,10 +39,61 @@ const WaitingRoom = () => {
   const stored = localStorage.getItem('cc_team');
   const team = stored ? JSON.parse(stored) : { teamName: 'UNNAMED', round: '1' };
 
-  const handleSimulate = () => {
-    setFlashing(true);
-    setTimeout(() => navigate('/countdown'), 400);
-  };
+  useEffect(() => {
+    const checkLiveRound = async () => {
+      if (hasNavigatedRef.current) return;
+
+      try {
+        const response = await fetch(`${API_URL}/admin/round`, { credentials: 'include' });
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const liveRound = data?.data?.find((r: any) => r.status === 'LIVE');
+        
+        // Check if a previously LIVE round has been reset to DRAFT
+        const storedRound = localStorage.getItem('cc_live_round');
+        if (storedRound) {
+          const parsedRound = JSON.parse(storedRound);
+          const currentRound = data?.data?.find((r: any) => r._id === parsedRound._id);
+          
+          if (currentRound && currentRound.status === 'DRAFT') {
+            // Round was reset - clear all submission data
+            const teamId = JSON.parse(localStorage.getItem('cc_team') || '{}')?.teamId;
+            if (teamId) {
+              localStorage.removeItem(`cc_submitted_${teamId}_${parsedRound._id}`);
+            }
+            localStorage.removeItem('cc_live_round');
+            localStorage.removeItem('cc_result');
+          }
+        }
+
+        if (!liveRound) return;
+
+        localStorage.setItem('cc_live_round', JSON.stringify({
+          _id: liveRound._id,
+          roundNumber: Number(liveRound.roundNumber || 0),
+          duration: Number(liveRound.duration || 0),
+          startTime: liveRound.startTime,
+          endTime: liveRound.endTime,
+        }));
+
+        hasNavigatedRef.current = true;
+        setFlashing(true);
+
+        const now = Date.now();
+        const startAt = new Date(liveRound.startTime).getTime();
+        const targetPath = startAt > now ? '/countdown' : '/contest';
+
+        setTimeout(() => navigate(targetPath), 400);
+      } catch (error) {
+        console.error('Waiting room poll error:', error);
+      }
+    };
+
+    checkLiveRound();
+    const interval = setInterval(checkLiveRound, 500);
+    return () => clearInterval(interval);
+  }, [navigate]);
 
   return (
     <div className="relative min-h-screen scanline-overlay">
@@ -150,23 +204,6 @@ const WaitingRoom = () => {
             >
               [ LEADERBOARD ]
             </button>
-            <div className="mt-2 text-center">
-              <p className="font-mono-tech text-[10px] text-muted-foreground/40 tracking-[2px] mb-2">
-                — FOR DEMO PURPOSES —
-              </p>
-              <button
-                onClick={handleSimulate}
-                className="font-pixel text-[9px] text-foreground px-6 py-3 transition-all hover:brightness-90 cursor-pointer"
-                style={{
-                  background: '#BE185D',
-                  border: '2px solid #F472B6',
-                  borderRadius: '0',
-                  filter: 'drop-shadow(0 0 8px rgba(244,114,182,0.5))',
-                }}
-              >
-                [ &gt;&gt; SIMULATE START ]
-              </button>
-            </div>
           </div>
         </div>
 

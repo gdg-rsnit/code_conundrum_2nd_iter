@@ -105,9 +105,12 @@ const startRound=asyncHandler(async(req:Request,res:Response)=>{
         return res.status(400).json({message:"cannot start a round while another is ongoing"})
     }
 
+    const preStartDelayMs = 10 * 1000
+    const plannedStartMs = Date.now() + preStartDelayMs
+
     round.status="LIVE";
-    round.startTime=new Date();
-    round.endTime=new Date(Date.now()+round.duration*1000)
+    round.startTime=new Date(plannedStartMs);
+    round.endTime=new Date(plannedStartMs + round.duration * 1000)
 
     const startedRound=await round.save();
      
@@ -298,21 +301,26 @@ const resetRound = asyncHandler(async (req: Request, res: Response) => {
         });
     }
 
-    await Submission.deleteMany({ roundId });
-    await Penalty.deleteMany({ roundId });
+    const roundObjectId = new mongoose.Types.ObjectId(roundId);
 
+    // Clear all submissions and penalties for this round
+    await Submission.deleteMany({ roundId: roundObjectId });
+    await Penalty.deleteMany({ roundId: roundObjectId });
+
+    // Reset round status to DRAFT
     round.status = "DRAFT";
     round.startTime = null;
     round.endTime = null;
     round.isPaused = false;
     round.pauseStartAt = null;
-    round.submissionLocked=false;
+    round.submissionLocked = false;
+    round.totalPauseDuration = 0;
     
     await round.save();
 
     return res.status(200).json({
         success: true,
-        message: "Round reset successfully"
+        message: "Round reset successfully - all submissions and penalties cleared"
     });
 });
 

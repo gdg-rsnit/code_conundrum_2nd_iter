@@ -22,13 +22,19 @@ export const addToLeaderboard = async (
   timeSeconds: number,
   accuracy: number
 ): Promise<void> => {
+  if (!redisClient.isOpen) return
+
   const key: string = `leaderboard:round:${round}`
   const redisScore: number = calcRedisScore(score, timeSeconds)
 
-  await redisClient.zAdd(key, {
-    score: redisScore,
-    value: JSON.stringify({ username, score, timeSeconds, accuracy })
-  })
+  try {
+    await redisClient.zAdd(key, {
+      score: redisScore,
+      value: JSON.stringify({ username, score, timeSeconds, accuracy })
+    })
+  } catch {
+    // MongoDB remains the source of truth when Redis is unavailable.
+  }
 }
 
 // Get top N participants for a round
@@ -36,11 +42,18 @@ export const getLeaderboard = async (
   round: number,
   limit: number
 ): Promise<LeaderboardEntry[]> => {
+  if (!redisClient.isOpen) return []
+
   const key: string = `leaderboard:round:${round}`
 
-  const raw: RedisZEntry[] = await redisClient.zRangeWithScores(
-    key, 0, limit - 1, { REV: true }
-  )
+  let raw: RedisZEntry[] = []
+  try {
+    raw = await redisClient.zRangeWithScores(
+      key, 0, limit - 1, { REV: true }
+    )
+  } catch {
+    return []
+  }
 
   // Return empty array if nothing in cache
   if (!raw || raw.length === 0) return []
@@ -53,7 +66,13 @@ export const getLeaderboard = async (
 
 // Delete cache for a round when scores are updated
 export const invalidateCache = async (round: number): Promise<void> => {
+  if (!redisClient.isOpen) return
+
   const key: string = `leaderboard:round:${round}`
-  await redisClient.del(key)
-  console.log(`Cache invalidated for round ${round}`)
+  try {
+    await redisClient.del(key)
+    console.log(`Cache invalidated for round ${round}`)
+  } catch {
+    // Ignore cache invalidation failure if Redis is down.
+  }
 }
