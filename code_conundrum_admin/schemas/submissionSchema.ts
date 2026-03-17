@@ -7,27 +7,35 @@ const objectIdSchema = z
     message: "Invalid ObjectId",
   });
 
-export const answerSubmissionSchema = z.object({
-  questionId: objectIdSchema,
-  selectedAnswer: objectIdSchema,
-});
-
 export const createSubmissionSchema = z.object({
   teamId: objectIdSchema,
   roundId: objectIdSchema,
-  answers: z
-    .array(answerSubmissionSchema)
-    .min(1, "At least one answer required"),
-  timeTaken: z.number().int().nonnegative().optional(),
-  questionsSolved: z.number().int().nonnegative().optional(),
+  questionsSolved: z.number().int().nonnegative(),
+  timeSeconds: z.number().int().nonnegative(),
+  submittedAt: z.iso.datetime().optional(),
+  accuracy: z.number().min(0).max(100).optional(),
 });
 
 export const updateSubmissionSchema = z.object({
-  timeTaken: z.number().int().nonnegative().optional(),
   questionsSolved: z.number().int().nonnegative().optional(),
-  isInvalidated: z.boolean().optional(),
+  timeSeconds: z.number().int().nonnegative().optional(),
+  submittedAt: z.iso.datetime().optional(),
+  accuracy: z.number().min(0).max(100).optional(),
+}).refine(
+  (data) => Object.keys(data).length > 0,
+  { message: "At least one field must be provided for update" }
+);
+
+export const submissionIdParamSchema = z.object({
+  submissionId: objectIdSchema,
 });
 
-export type AnswerSubmissionInput = z.infer<typeof answerSubmissionSchema>;
+export const submissionQuerySchema = z.object({
+  teamId: objectIdSchema.optional(),
+  roundId: objectIdSchema.optional(),
+});
+
 export type CreateSubmissionInput = z.infer<typeof createSubmissionSchema>;
 export type UpdateSubmissionInput = z.infer<typeof updateSubmissionSchema>;
+export type SubmissionIdParam = z.infer<typeof submissionIdParamSchema>;
+export type SubmissionQuery = z.infer<typeof submissionQuerySchema>;

@@ -5,7 +5,7 @@ import { Round } from "../models/roundModel.js";
 import mongoose, { Types } from "mongoose";
 import { Question } from "../models/questionModel.js";
 import { Submission } from "../models/submissionModel.js";
-import { Penalty } from "../models/penaltySchema.js";
+import { Penalty } from "../models/penaltyModel.js";
 import { Answer } from "../models/answerModel.js";
 
 const createRound = asyncHandler(async (req: Request, res: Response) => {

@@ -32,4 +32,6 @@ const teamRoundSchema = new Schema<ITeamRound>({
     }
 }, { timestamps: true });
 
+teamRoundSchema.index({ teamId: 1, roundId: 1 }, { unique: true });
+
 export const TeamRound = mongoose.model<ITeamRound>("TeamRound", teamRoundSchema);

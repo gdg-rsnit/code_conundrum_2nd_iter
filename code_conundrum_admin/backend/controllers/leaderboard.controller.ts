@@ -12,14 +12,11 @@ import {
 } from '../services/participantService.js'
 
 import { getRoundLimit } from '../utils/rankCalculator.js'
-
-interface AddScoreBody {
-  username: string
-  score: number
-  timeSeconds: number
-  round: number
-  accuracy?: number
-}
+import {
+  addScoreSchema,
+  roundParamSchema,
+  invalidateCacheSchema,
+} from '../../schemas/leaderboardSchema.js'
 
 interface LeaderboardEntry {
   rank: number
@@ -31,32 +28,24 @@ interface LeaderboardEntry {
 
 // POST /leaderboard
 // Adds a score to the leaderboard — updates both Redis and MongoDB
-export const addScore = async (req: Request<{}, {}, AddScoreBody>, res: Response): Promise<void> => {
-  const { username, score, timeSeconds, round, accuracy } = req.body
+export const addScore = async (req: Request, res: Response): Promise<void> => {
+  const result = addScoreSchema.safeParse(req.body)
+  if (!result.success) {
+    res.status(400).json({ error: result.error.issues }); return
+  }
 
-  // Validate
-  if (!username || typeof username !== 'string') {
-    res.status(400).json({ error: 'Invalid username' }); return
-  }
-  if (isNaN(score) || Number(score) < 0) {
-    res.status(400).json({ error: 'Invalid score' }); return
-  }
-  if (isNaN(timeSeconds) || Number(timeSeconds) < 0) {
-    res.status(400).json({ error: 'Invalid time' }); return
-  }
-  if (isNaN(accuracy ?? 0) || Number(accuracy ?? 0) < 0 || Number(accuracy ?? 0) > 100) {
-    res.status(400).json({ error: 'Invalid accuracy' }); return
-  }
-  if (![1, 2, 3].includes(Number(round))) {
-    res.status(400).json({ error: 'Round must be 1, 2 or 3' }); return
-  }
+  const { username, score, timeSeconds, round, accuracy = 0 } = result.data
 
   try {
     // Write to Redis
-    await addToLeaderboard(round, username, Number(score), Number(timeSeconds), Number(accuracy ?? 0))
+    await addToLeaderboard(round, username, score, timeSeconds, accuracy)
 
     // Write to MongoDB
-    await upsertParticipant(username, Number(score), Number(timeSeconds), Number(round), Number(accuracy ?? 0))
+    const participant = await upsertParticipant(username, score, timeSeconds, round, accuracy)
+
+    if (!participant) {
+      res.status(404).json({ error: 'Team or round not found for submission' }); return
+    }
 
     res.status(200).json({ message: `${username} added to leaderboard` })
 
@@ -69,12 +58,12 @@ export const addScore = async (req: Request<{}, {}, AddScoreBody>, res: Response
 // GET /leaderboard/:round
 // Returns sorted leaderboard — checks Redis first, falls back to MongoDB
 export const fetchLeaderboard = async (req: Request<{ round: string }>, res: Response): Promise<void> => {
-  const round = Number(req.params.round)
-
-  if (![1, 2, 3].includes(round)) {
-    res.status(400).json({ error: 'Round must be 1, 2 or 3' }); return
+  const paramResult = roundParamSchema.safeParse(req.params)
+  if (!paramResult.success) {
+    res.status(400).json({ error: paramResult.error.issues }); return
   }
 
+  const round = paramResult.data.round
   const limit: number = getRoundLimit(round)
 
   try {
@@ -112,25 +101,14 @@ export const fetchLeaderboard = async (req: Request<{ round: string }>, res: Res
 
 // POST /leaderboard/invalidate
 // After any score change
-export const clearCache = async (req: Request<{}, {}, { round?: number }>, res: Response): Promise<void> => {
-  const { round } = req.body
-
-  if (round && ![1, 2, 3].includes(Number(round))) {
-    res.status(400).json({ error: 'Round must be 1, 2 or 3' }); return
+export const clearCache = async (req: Request, res: Response): Promise<void> => {
+  const result = invalidateCacheSchema.safeParse(req.body)
+  if (!result.success) {
+    res.status(400).json({ error: result.error.issues }); return
   }
 
   try {
-    if (round) {
-      // Invalidate specific round
-      await invalidateCache(round)
-    } else {
-      // Invalidate all rounds
-      await Promise.all([
-        invalidateCache(1),
-        invalidateCache(2),
-        invalidateCache(3)
-      ])
-    }
+    await invalidateCache(result.data.round)
 
     res.status(200).json({ message: 'Cache cleared' })
 

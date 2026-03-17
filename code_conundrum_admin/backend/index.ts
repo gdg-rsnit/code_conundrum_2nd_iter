@@ -9,8 +9,8 @@ import teamRoutes from "./routes/team.routes.js";
 import roundRouters from "./routes/round.routes.js";
 import questionRoutes from "./routes/question.routes.js";
 import answerRoutes from "./routes/answer.routes.js";
-// import leaderboardRoutes from "./routes/leaderboard.routes.js";
-// import submissionRoutes from "./routes/submission.routes.js";
+import leaderboardRoutes from "./routes/leaderboard.routes.js";
+import submissionRoutes from "./routes/submission.routes.js";
 
 dotenv.config();
 const port = process.env.PORT || 5000;
@@ -34,8 +34,8 @@ app.use("/api/admin/teams", teamRoutes);
 app.use("/api/admin/round", roundRouters);
 app.use("/api/admin/questions", questionRoutes);
 app.use("/api/admin/answers", answerRoutes);
-// app.use("/api/admin/leaderboard", leaderboardRoutes);
-// app.use("/api/submissions", submissionRoutes);
+app.use("/api/admin/leaderboard", leaderboardRoutes);
+app.use("/api/submissions", submissionRoutes);
 
 app.listen(port, () => console.log(`app running on port ${port}`));
 

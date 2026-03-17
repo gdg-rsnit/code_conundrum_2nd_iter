@@ -1,10 +1,10 @@
 import asyncHandler from "../middlewares/asyncHandler.middleware.js";
 import type { Request, Response } from "express";
 import { Team, type ITeam } from "../models/teamModel.js";
-import { Penalty, type IPenalty } from "../models/penaltySchema.js";
+import { Penalty, type IPenalty } from "../models/penaltyModel.js";
 import { createPenaltySchema, updatePenaltySchema } from "../../schemas/penaltySchema.js";
 import { ZodError } from "zod";
-import { TeamRound } from "../models/teamRoundSchema.js";
+import { TeamRound } from "../models/teamRoundModel.js";
 
 
 //ban/unban
