@@ -12,8 +12,8 @@ import {
 const router = express.Router();
 
 router.post("/", authenticate, authorizeAdmin, createAnswer);
-router.get("/round/:roundId", authenticate, authorizeAdmin, getAnswersByRound);
-router.get("/:answerId", authenticate, authorizeAdmin, getAnswerById);
+router.get("/round/:roundId", authenticate, getAnswersByRound);
+router.get("/:answerId", authenticate, getAnswerById);
 
 router.patch("/:answerId", authenticate, authorizeAdmin, updateAnswer);
 

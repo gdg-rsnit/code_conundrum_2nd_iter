@@ -1,4 +1,5 @@
 import { User, type IUser } from "../models/userModel.js";
+import { Team } from "../models/teamModel.js";
 import asyncHandler from "../middlewares/asyncHandler.middleware.js";
 import bcrypt from "bcryptjs";
 import createToken from "../utils/createToken.js";
@@ -17,26 +18,47 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
 
   const { email, password } = result.data;
 
-  const existingUser = await User.findOne({ email }).select("+password");
+  // Try to find user by email first
+  let existingUser = await User.findOne({ email }).select("+password");
+
+  // If not found, try to find by teamName
+  if (!existingUser) {
+    const team = await Team.findOne({ teamName: email });
+    if (team) {
+      existingUser = await User.findOne({ teamId: team._id }).select("+password");
+    }
+  }
 
   if (!existingUser) {
-    return res.status(401).json({success:false,message:"Invalid email or password"});
+    return res.status(401).json({ success: false, message: "Invalid credentials" });
   }
 
   const isPasswordValid = await bcrypt.compare(password, existingUser.password);
 
   if (!isPasswordValid) {
-    return res.status(401).json({success:false,message:"Invalid email or password"});
+    return res.status(401).json({ success: false, message: "Invalid credentials" });
+  }
+
+  if (existingUser.banned) {
+    return res.status(403).json({ success: false, message: "This account has been banned" });
   }
 
   createToken(res, existingUser._id.toString());
 
+  // If it's a TEAM user, we might want to include team info
+  let teamInfo = null;
+  if (existingUser.role === "TEAM" && existingUser.teamId) {
+    teamInfo = await Team.findById(existingUser.teamId);
+  }
+
   res.status(200).json({
+    success: true,
     message: "Login successful",
     user: {
       id: existingUser._id,
       email: existingUser.email,
       role: existingUser.role,
+      team: teamInfo,
     },
   });
 });

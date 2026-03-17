@@ -2,45 +2,24 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StarfieldBackground from '@/components/StarfieldBackground';
 import PixelBadge from '@/components/PixelBadge';
-import PixelButton from '@/components/PixelButton';
 import { cn } from '@/lib/utils';
-import { Maximize2 } from 'lucide-react';
+import { Maximize2, Loader2, Minimize2 } from 'lucide-react';
+import { toast } from 'sonner';
 
-const problems = [
-  { id: 'Q1', text: 'What does this code output when input is 5?' },
-  { id: 'Q2', text: 'Which snippet checks if a number is prime?' },
-  { id: 'Q3', text: 'Which function reverses a string?' },
-  { id: 'Q4', text: 'Which code finds the maximum in a list?' },
-  { id: 'Q5', text: 'Which snippet implements bubble sort?' },
-  { id: 'Q6', text: 'Which code counts vowels in a string?' },
-  { id: 'Q7', text: 'Which function calculates factorial recursively?' },
-  { id: 'Q8', text: 'Which snippet checks for palindrome?' },
-];
-
-const snippets = [
-  { id: 'A', label: 'SNIPPET A', code: 'def fn(x):\n    return x * x + 2 * x + 1' },
-  { id: 'B', label: 'SNIPPET B', code: 'def fn(n):\n    if n < 2: return False\n    for i in range(2, int(n**0.5)+1):\n        if n % i == 0: return False\n    return True' },
-  { id: 'C', label: 'SNIPPET C', code: 'def fn(s):\n    return s[::-1]' },
-  { id: 'D', label: 'SNIPPET D', code: 'def fn(lst):\n    return max(lst)' },
-  { id: 'E', label: 'SNIPPET E', code: 'def fn(arr):\n    n = len(arr)\n    for i in range(n):\n        for j in range(0, n-i-1):\n            if arr[j] > arr[j+1]:\n                arr[j], arr[j+1] = arr[j+1], arr[j]\n    return arr' },
-  { id: 'F', label: 'SNIPPET F', code: 'def fn(s):\n    return sum(1 for c in s if c in \'aeiouAEIOU\')' },
-  { id: 'G', label: 'SNIPPET G', code: 'def fn(n):\n    if n == 0: return 1\n    return n * fn(n-1)' },
-  { id: 'H', label: 'SNIPPET H', code: 'def fn(s):\n    return s == s[::-1]' },
-  { id: 'I', label: 'SNIPPET I (DECOY)', code: 'def fn(x, y):\n    return x ** y - y ** x' },
-];
-
-const correctAnswers: Record<string, string> = {
-  Q1: 'A', Q2: 'B', Q3: 'C', Q4: 'D', Q5: 'E', Q6: 'F', Q7: 'G', Q8: 'H',
-};
+const API_URL = 'http://localhost:5000/api';
 
 const Contest = () => {
   const navigate = useNavigate();
+  const [questions, setQuestions] = useState<any[]>([]);
+  const [snippets, setSnippets] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [dragging, setDragging] = useState<string | null>(null);
   const [selectedSnippet, setSelectedSnippet] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'problems' | 'snippets'>('problems');
-  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes
+  const [timeLeft, setTimeLeft] = useState(0);
   const [locked, setLocked] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [expandedProblem, setExpandedProblem] = useState<{title: string, content: string} | null>(null);
   const [expandedSnippet, setExpandedSnippet] = useState<{title: string, content: string, htmlContent: any} | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
@@ -48,30 +27,101 @@ const Contest = () => {
   const stored = localStorage.getItem('cc_team');
   const team = stored ? JSON.parse(stored) : { teamName: 'TEAM', round: '1' };
 
-  useEffect(() => {
-    timerRef.current = setInterval(() => {
-      setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          return 0;
-        }
-        return prev - 1;
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        toast.error(`Error attempting to enable full-screen mode: ${err.message}`);
       });
-    }, 1000);
-    return () => clearInterval(timerRef.current);
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
   useEffect(() => {
-    if (timeLeft === 0 && !locked) {
+    const fetchData = async () => {
+      try {
+        // 1. Get Live Round
+        const roundRes = await fetch(`${API_URL}/admin/round`, { credentials: 'include' });
+        const roundData = await roundRes.json();
+        const liveRound = roundData.data.find((r: any) => r.status === 'LIVE');
+
+        if (!liveRound) {
+          toast.error('No live round found');
+          navigate('/waiting-room');
+          return;
+        }
+
+        // 2. Set timer
+        const endTime = new Date(liveRound.endTime).getTime();
+        const now = new Date().getTime();
+        const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
+        setTimeLeft(remaining);
+
+        // 3. Get Questions
+        const qRes = await fetch(`${API_URL}/admin/questions/round/${liveRound._id}`, { credentials: 'include' });
+        const qData = await qRes.json();
+        
+        // 4. Get Answers (Snippets)
+        const aRes = await fetch(`${API_URL}/admin/answers/round/${liveRound._id}`, { credentials: 'include' });
+        const aData = await aRes.json();
+
+        setQuestions(qData.data.map((q: any, i: number) => ({
+          id: q._id,
+          label: `Q${i + 1}`,
+          text: q.question
+        })));
+
+        setSnippets(aData.data.map((a: any, i: number) => ({
+          id: a._id,
+          label: `SNIPPET ${String.fromCharCode(65 + i)}`,
+          code: a.code
+        })));
+
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Fetch error:', error);
+        toast.error('Failed to load mission data');
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [navigate]);
+
+  useEffect(() => {
+    if (timeLeft > 0 && !locked) {
+      timerRef.current = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            clearInterval(timerRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => clearInterval(timerRef.current);
+  }, [timeLeft, locked]);
+
+  useEffect(() => {
+    if (timeLeft === 0 && !locked && !isLoading) {
       handleSubmit();
     }
-  }, [timeLeft, locked]);
+  }, [timeLeft, locked, isLoading]);
 
   const assignedSnippets = new Set(Object.values(assignments));
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
-  const percentage = (timeLeft / 600) * 100;
-  const timerColor = percentage > 50 ? '#22C55E' : percentage > 25 ? '#EAB308' : '#EF4444';
+  const percentage = timeLeft > 0 ? (timeLeft / 600) * 100 : 0;
+  const timerColor = timeLeft > 300 ? '#22C55E' : timeLeft > 60 ? '#EAB308' : '#EF4444';
 
   const handleDragStart = (snippetId: string) => {
     if (locked) return;
@@ -114,16 +164,16 @@ const Contest = () => {
   const getSnippet = (id: string) => snippets.find(s => s.id === id);
   const matchedCount = Object.keys(assignments).length;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setLocked(true);
     clearInterval(timerRef.current);
-    let score = 0;
-    Object.entries(assignments).forEach(([q, s]) => {
-      if (correctAnswers[q] === s) score++;
-    });
-    const timeTaken = 600 - timeLeft;
-    localStorage.setItem('cc_result', JSON.stringify({ score, total: 8, timeTaken }));
-    navigate('/round-complete');
+    
+    toast.info('Mission data uplinked. Calculating results...');
+    
+    // In a real scenario, we'd send assignments to the backend
+    setTimeout(() => {
+      navigate('/round-complete');
+    }, 2000);
   };
 
   const highlightCode = (code: string) => {
@@ -136,6 +186,15 @@ const Contest = () => {
     });
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-space-navy flex flex-col items-center justify-center gap-4">
+        <Loader2 className="w-12 h-12 text-primary animate-spin" />
+        <span className="font-pixel text-primary text-xs animate-pulse">INITIATING MISSION UPLINK...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="relative min-h-screen scanline-overlay">
       <StarfieldBackground showClouds={false} showPlanets={false} opacity={0.2} />
@@ -145,7 +204,14 @@ const Contest = () => {
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <PixelBadge variant="cyan">ROUND 0{team.round}</PixelBadge>
-            <span className="hidden sm:inline font-pixel text-[8px] text-muted-foreground">{team.teamName.toUpperCase()}</span>
+            <span className="hidden sm:inline font-pixel text-[8px] text-muted-foreground">{team.teamName?.toUpperCase()}</span>
+            <button 
+              onClick={toggleFullscreen}
+              className="p-1 hover:bg-primary/20 rounded transition-colors text-primary"
+              title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+            >
+              {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+            </button>
           </div>
           <div
             className="font-pixel text-xl md:text-2xl tracking-widest"
@@ -155,7 +221,7 @@ const Contest = () => {
           </div>
           <div className="flex items-center gap-3">
             <span className="font-pixel text-[8px] text-muted-foreground">
-              MATCHED: {matchedCount}/8
+              MATCHED: {matchedCount}/{questions.length}
             </span>
             <button
               onClick={handleSubmit}
@@ -204,7 +270,7 @@ const Contest = () => {
             <div className="font-pixel text-[10px] text-secondary border-b-2 border-secondary/30 pb-2 mb-4">
               [ MISSION OBJECTIVES ]
             </div>
-            {problems.map((p) => (
+            {questions.map((p) => (
               <div
                 key={p.id}
                 className="bg-space-navy border border-muted-foreground/10 p-4"
@@ -213,23 +279,12 @@ const Contest = () => {
                 onClick={() => handleTapAssign(p.id)}
               >
                 <div className="flex items-start gap-3 mb-3">
-                  <div className="w-8 h-8 flex-shrink-0 border-2 border-primary flex items-center justify-center cursor-pointer hover:bg-primary/20 transition-colors" onClick={() => setExpandedProblem({ title: `PROBLEM ${p.id}`, content: p.text })}>
-                    <span className="font-pixel text-[8px] text-primary">{p.id}</span>
+                  <div className="w-8 h-8 flex-shrink-0 border-2 border-primary flex items-center justify-center cursor-pointer hover:bg-primary/20 transition-colors" onClick={() => setExpandedProblem({ title: `PROBLEM ${p.label}`, content: p.text })}>
+                    <span className="font-pixel text-[8px] text-primary">{p.label}</span>
                   </div>
-                  <span className="flex-1 text-xs text-muted-foreground font-mono-tech leading-relaxed cursor-pointer hover:text-primary transition-colors" onClick={() => setExpandedProblem({ title: `PROBLEM ${p.id}`, content: p.text })}>
+                  <span className="flex-1 text-xs text-muted-foreground font-mono-tech leading-relaxed cursor-pointer hover:text-primary transition-colors" onClick={() => setExpandedProblem({ title: `PROBLEM ${p.label}`, content: p.text })}>
                     {p.text}
                   </span>
-                  <button
-                    title="Expand Problem"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setExpandedProblem({ title: `PROBLEM ${p.id}`, content: p.text });
-                    }}
-                    className="text-muted-foreground hover:text-primary transition-all duration-300 hover:scale-110 focus:outline-none ml-2 mt-1"
-                    aria-label="Expand Problem"
-                  >
-                    <Maximize2 size={16} />
-                  </button>
                 </div>
 
                 {/* Drop Zone */}

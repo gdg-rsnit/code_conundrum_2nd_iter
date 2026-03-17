@@ -15,10 +15,10 @@ const router = express.Router();
 router.post("/createQuestions", authenticate, authorizeAdmin, createQuestionsWithAnswers);
 
 // Get all questions for a round - GET /questions/round/:roundId
-router.get("/round/:roundId", authenticate, authorizeAdmin, getQuestionsbyRound);
+router.get("/round/:roundId", authenticate, getQuestionsbyRound);
 
 // Get single question - GET /questions/:questionId
-router.get("/:questionId", authenticate, authorizeAdmin, getQuestionById);
+router.get("/:questionId", authenticate, getQuestionById);
 
 // Update question - PATCH /questions/:questionId
 router.patch("/:questionId", authenticate, authorizeAdmin, updateQuestion);
