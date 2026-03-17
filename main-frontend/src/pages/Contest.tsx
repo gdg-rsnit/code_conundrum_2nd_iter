@@ -8,6 +8,15 @@ import { toast } from 'sonner';
 
 const API_URL = 'http://localhost:5000/api';
 
+const shuffleArray = <T,>(arr: T[]): T[] => {
+  const next = [...arr];
+  for (let i = next.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [next[i], next[j]] = [next[j], next[i]];
+  }
+  return next;
+};
+
 const Contest = () => {
   const navigate = useNavigate();
   const [questions, setQuestions] = useState<any[]>([]);
@@ -17,9 +26,13 @@ const Contest = () => {
   const [selectedSnippet, setSelectedSnippet] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'problems' | 'snippets'>('problems');
   const [timeLeft, setTimeLeft] = useState(0);
+  const [roundDuration, setRoundDuration] = useState(0);
+  const [liveRoundId, setLiveRoundId] = useState<string | null>(null);
+  const [liveRoundNumber, setLiveRoundNumber] = useState<number | null>(null);
   const [locked, setLocked] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [allowExitFullscreen, setAllowExitFullscreen] = useState(false);
   const [expandedProblem, setExpandedProblem] = useState<{title: string, content: string} | null>(null);
   const [expandedSnippet, setExpandedSnippet] = useState<{title: string, content: string, htmlContent: any} | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
@@ -32,22 +45,93 @@ const Contest = () => {
       document.documentElement.requestFullscreen().catch(err => {
         toast.error(`Error attempting to enable full-screen mode: ${err.message}`);
       });
-    } else {
+    } else if (allowExitFullscreen) {
       document.exitFullscreen();
+    } else {
+      toast.error('You can only exit fullscreen after submission or when the round ends.');
     }
   };
 
+  // Request fullscreen when contest loads
+  useEffect(() => {
+    if (!isLoading) {
+      let retryCount = 0;
+      const maxRetries = 3;
+      
+      const requestFS = () => {
+        document.documentElement.requestFullscreen()
+          .then(() => {
+            console.log('Fullscreen activated successfully');
+            setIsFullscreen(true);
+          })
+          .catch(err => {
+            console.warn(`Fullscreen request failed (attempt ${retryCount + 1}):`, err.message);
+            retryCount++;
+            
+            // Retry up to 3 times with increasing delay
+            if (retryCount < maxRetries) {
+              setTimeout(requestFS, 100 * retryCount);
+            } else {
+              toast.error('Could not enable fullscreen. Please click the fullscreen button manually.');
+            }
+          });
+      };
+      
+      // Start fullscreen request with initial delay
+      const timer = setTimeout(requestFS, 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
+
+  // Prevent accidental fullscreen exit
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
+      const isNowFullscreen = !!document.fullscreenElement;
+      setIsFullscreen(isNowFullscreen);
+      
+      // Re-enter fullscreen if user tries to exit before submission
+      if (!isNowFullscreen && !allowExitFullscreen) {
+        setTimeout(() => {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }, 100);
+      }
     };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Block ESC key while contest is active (not submitted yet)
+      if (e.key === 'Escape' && !allowExitFullscreen && isFullscreen) {
+        e.preventDefault();
+        toast.error('You cannot exit fullscreen until you submit or the round ends.');
+      }
+    };
+    
     document.addEventListener('fullscreenchange', handleFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [allowExitFullscreen, isFullscreen]);
+
+  // Cleanup: exit fullscreen when component unmounts or navigation happens
+  useEffect(() => {
+    return () => {
+      if (allowExitFullscreen && document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    };
+  }, [allowExitFullscreen]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const isBanned = Boolean(team?.banned || team?.team?.banned);
+        if (isBanned) {
+          toast.error('Your team is banned and cannot enter the contest.');
+          navigate('/waiting-room');
+          return;
+        }
+
         // 1. Get Live Round
         const roundRes = await fetch(`${API_URL}/admin/round`, { credentials: 'include' });
         const roundData = await roundRes.json();
@@ -60,10 +144,49 @@ const Contest = () => {
         }
 
         // 2. Set timer
+        const startTime = new Date(liveRound.startTime).getTime();
         const endTime = new Date(liveRound.endTime).getTime();
         const now = new Date().getTime();
-        const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
+        const remaining = now < startTime
+          ? Math.max(0, Math.floor((endTime - startTime) / 1000))
+          : Math.max(0, Math.floor((endTime - now) / 1000));
         setTimeLeft(remaining);
+        setRoundDuration(Number(liveRound.duration || 0));
+        setLiveRoundId(liveRound._id);
+        setLiveRoundNumber(Number(liveRound.roundNumber || 0));
+
+        const alreadySubmitted = localStorage.getItem(`cc_submitted_${team?.teamId}_${liveRound._id}`) === 'true';
+        if (alreadySubmitted) {
+          navigate('/round-complete');
+          return;
+        }
+
+        if (team?.teamId) {
+          const submissionRes = await fetch(
+            `${API_URL}/submissions?teamId=${team.teamId}&roundId=${liveRound._id}`,
+            { credentials: 'include' }
+          );
+          const submissionData = await submissionRes.json().catch(() => ({}));
+          if (submissionRes.ok && Array.isArray(submissionData?.data) && submissionData.data.length > 0) {
+            const existing = submissionData.data[0];
+            localStorage.setItem(`cc_submitted_${team.teamId}_${liveRound._id}`, 'true');
+            localStorage.setItem('cc_result', JSON.stringify({
+              score: Number(existing?.questionsSolved || 0),
+              total: Number(existing?.totalQuestions || questions.length || 0),
+              timeTaken: Number(existing?.timeSeconds || 0),
+              accuracy: Number(existing?.accuracy || 0),
+              matchedCount: Number(existing?.questionsSolved || 0)
+            }));
+            navigate('/round-complete');
+            return;
+          }
+        }
+
+        localStorage.setItem('cc_live_round', JSON.stringify({
+          _id: liveRound._id,
+          roundNumber: Number(liveRound.roundNumber || 0),
+          duration: Number(liveRound.duration || 0)
+        }));
 
         // 3. Get Questions
         const qRes = await fetch(`${API_URL}/admin/questions/round/${liveRound._id}`, { credentials: 'include' });
@@ -73,13 +196,17 @@ const Contest = () => {
         const aRes = await fetch(`${API_URL}/admin/answers/round/${liveRound._id}`, { credentials: 'include' });
         const aData = await aRes.json();
 
-        setQuestions(qData.data.map((q: any, i: number) => ({
+        const shuffledQuestions = shuffleArray(qData.data || []);
+        const shuffledAnswers = shuffleArray(aData.data || []);
+
+        setQuestions(shuffledQuestions.map((q: any, i: number) => ({
           id: q._id,
           label: `Q${i + 1}`,
-          text: q.question
+          text: q.question,
+          correctAnswerId: q.correctAnswerId
         })));
 
-        setSnippets(aData.data.map((a: any, i: number) => ({
+        setSnippets(shuffledAnswers.map((a: any, i: number) => ({
           id: a._id,
           label: `SNIPPET ${String.fromCharCode(65 + i)}`,
           code: a.code
@@ -95,6 +222,42 @@ const Contest = () => {
 
     fetchData();
   }, [navigate]);
+
+  // Sync timer with backend - check for pause/resume and recalculate remaining time
+  useEffect(() => {
+    if (isLoading || locked) return;
+
+    const syncTimer = async () => {
+      try {
+        const roundRes = await fetch(`${API_URL}/admin/round`, { credentials: 'include' });
+        const roundData = await roundRes.json();
+        const liveRound = roundData.data.find((r: any) => r._id === liveRoundId);
+
+        if (!liveRound || liveRound.status !== 'LIVE') {
+          return;
+        }
+
+        // Check if round is paused
+        if (liveRound.isPaused) {
+          clearInterval(timerRef.current);
+          return;
+        }
+
+        // Recalculate time remaining based on server endTime
+        const now = new Date().getTime();
+        const endTime = new Date(liveRound.endTime).getTime();
+        const remaining = Math.max(0, Math.floor((endTime - now) / 1000));
+        
+        setTimeLeft(remaining);
+      } catch (error) {
+        console.error('Timer sync error:', error);
+      }
+    };
+
+    // Sync every 2 seconds
+    const syncInterval = setInterval(syncTimer, 2000);
+    return () => clearInterval(syncInterval);
+  }, [isLoading, locked, liveRoundId]);
 
   useEffect(() => {
     if (timeLeft > 0 && !locked) {
@@ -113,14 +276,15 @@ const Contest = () => {
 
   useEffect(() => {
     if (timeLeft === 0 && !locked && !isLoading) {
-      handleSubmit();
+      setAllowExitFullscreen(true);
+      handleSubmit('auto-timeout');
     }
   }, [timeLeft, locked, isLoading]);
 
   const assignedSnippets = new Set(Object.values(assignments));
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
-  const percentage = timeLeft > 0 ? (timeLeft / 600) * 100 : 0;
+  const percentage = roundDuration > 0 ? (timeLeft / roundDuration) * 100 : 0;
   const timerColor = timeLeft > 300 ? '#22C55E' : timeLeft > 60 ? '#EAB308' : '#EF4444';
 
   const handleDragStart = (snippetId: string) => {
@@ -164,16 +328,102 @@ const Contest = () => {
   const getSnippet = (id: string) => snippets.find(s => s.id === id);
   const matchedCount = Object.keys(assignments).length;
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (source: 'manual' | 'auto-timeout' = 'manual') => {
+    if (locked) return;
+
     setLocked(true);
     clearInterval(timerRef.current);
-    
-    toast.info('Mission data uplinked. Calculating results...');
-    
-    // In a real scenario, we'd send assignments to the backend
+
+    const teamId = team?.teamId;
+    const roundId = liveRoundId;
+
+    const submittedAnswers = questions
+      .filter((q) => assignments[q.id])
+      .map((q) => ({
+        questionId: q.id,
+        selectedAnswer: assignments[q.id]
+      }));
+
+    const questionsSolved = questions.reduce((count, q) => {
+      return count + (assignments[q.id] && assignments[q.id] === q.correctAnswerId ? 1 : 0);
+    }, 0);
+
+    const timeSpentSeconds = Math.max(0, roundDuration - timeLeft);
+    const accuracy = questions.length > 0
+      ? Number(((questionsSolved / questions.length) * 100).toFixed(2))
+      : 0;
+
+    const payload = {
+      teamId,
+      roundId,
+      questionsSolved,
+      timeSeconds: timeSpentSeconds,
+      submittedAt: new Date().toISOString(),
+      accuracy,
+      // Extra details for traceability/client analytics (backend can ignore unknown keys)
+      answers: submittedAnswers,
+      source,
+      totalQuestions: questions.length,
+      matchedCount,
+      assignments
+    };
+
+    localStorage.setItem('cc_result', JSON.stringify({
+      score: questionsSolved,
+      total: questions.length,
+      timeTaken: timeSpentSeconds,
+      accuracy,
+      matchedCount
+    }));
+
+    if (!teamId || !roundId) {
+      toast.error('Missing team or round context for submission.');
+      navigate('/round-complete');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_URL}/submissions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+
+      const responseData = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(responseData?.message || 'Failed to submit round data');
+      }
+
+      localStorage.setItem(`cc_submitted_${teamId}_${roundId}`, 'true');
+
+      const submission = responseData?.data || {};
+      localStorage.setItem('cc_result', JSON.stringify({
+        score: Number(submission?.questionsSolved ?? questionsSolved),
+        total: questions.length,
+        timeTaken: Number(submission?.timeSeconds ?? timeSpentSeconds),
+        accuracy: Number(submission?.accuracy ?? accuracy),
+        matchedCount
+      }));
+
+      toast.success('Submission sent successfully. Leaderboard is updating live.');
+    } catch (error: any) {
+      console.error('Submission error:', error);
+      toast.error(error?.message || 'Submission failed.');
+    }
+
+    // Allow fullscreen exit and exit fullscreen
+    setAllowExitFullscreen(true);
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
+
     setTimeout(() => {
       navigate('/round-complete');
-    }, 2000);
+    }, 1200);
   };
 
   const highlightCode = (code: string) => {
@@ -224,7 +474,7 @@ const Contest = () => {
               MATCHED: {matchedCount}/{questions.length}
             </span>
             <button
-              onClick={handleSubmit}
+              onClick={() => handleSubmit('manual')}
               disabled={locked}
               className="font-pixel text-[8px] bg-secondary text-secondary-foreground px-3 py-1.5 border-2 border-secondary/60 hover:bg-secondary/80 disabled:opacity-50 transition-all"
             >

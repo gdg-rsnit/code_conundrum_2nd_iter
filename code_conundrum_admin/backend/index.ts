@@ -38,7 +38,8 @@ try {
   await redisClient.connect();
   console.log("Redis connected successfully");
 } catch (error) {
-  console.error("Redis connection failed:", error);
+  const message = error instanceof Error ? error.message : String(error)
+  console.warn(`Redis connection failed (${message}). Running with DB fallback only.`);
 }
 
 app.use(express.json());

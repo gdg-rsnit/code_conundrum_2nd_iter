@@ -30,6 +30,8 @@ const participantSchema = new Schema<ISubmission>({
   accuracy: { type: Number, default: 0 }
 },{timestamps:true})
 
+participantSchema.index({ teamId: 1, roundId: 1 }, { unique: true })
+
 export const Submission = mongoose.model<ISubmission>('Participant', participantSchema)
 
 export default Submission

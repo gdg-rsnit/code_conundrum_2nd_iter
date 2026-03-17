@@ -39,6 +39,15 @@ export const createOrUpdateSubmission = asyncHandler(async (
     return res.status(404).json({ success: false, message: 'Team not found' })
   }
 
+  if (team.banned) {
+    return res.status(403).json({ success: false, message: 'Banned teams cannot submit' })
+  }
+
+  const existingSubmission = await Submission.findOne({ teamId, roundId }).lean()
+  if (existingSubmission) {
+    return res.status(409).json({ success: false, message: 'Submission already exists for this round' })
+  }
+
   const payload = {
     teamId,
     roundId,
@@ -48,11 +57,7 @@ export const createOrUpdateSubmission = asyncHandler(async (
     accuracy: accuracyVal,
   }
 
-  const submission = await Submission.findOneAndUpdate(
-    { teamId, roundId },
-    payload,
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  )
+  const submission = await Submission.create(payload)
 
   // Fire leaderboard + participant updates as side effects (non-blocking)
   const sideEffects = await Promise.allSettled([

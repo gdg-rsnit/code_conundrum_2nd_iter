@@ -5,7 +5,7 @@ import { TrophyIcon } from '@/components/PixelIcons';
 const RoundComplete = () => {
   const stored = localStorage.getItem('cc_result');
   const result = stored ? JSON.parse(stored) : { score: 0, total: 8, timeTaken: 0 };
-  const accuracy = Math.round((result.score / result.total) * 100);
+  const accuracy = result.total > 0 ? Math.round((result.score / result.total) * 100) : 0;
   const mins = Math.floor(result.timeTaken / 60);
   const secs = result.timeTaken % 60;
 
@@ -43,8 +43,16 @@ const RoundComplete = () => {
             {accuracy}% ACCURACY
           </div>
 
-          <div className="flex justify-center content-center w-full">
-            <Link to="/waiting-room" className="w-full sm:w-auto">
+          <div className="flex flex-col gap-4 justify-center content-center w-full">
+            <Link to="/leaderboard" className="w-full">
+              <button
+                className="font-pixel text-[9px] text-foreground bg-rank-gold border-2 border-rank-gold/60 px-8 py-4 hover:bg-rank-gold/80 transition-all w-full whitespace-nowrap"
+                style={{ filter: 'drop-shadow(0 0 8px hsl(45 93% 47% / 0.5))' }}
+              >
+                [ VIEW LEADERBOARD ]
+              </button>
+            </Link>
+            <Link to="/waiting-room" className="w-full">
               <button
                 className="font-pixel text-[9px] text-foreground bg-accent border-2 border-accent/60 px-8 py-4 hover:bg-accent/80 transition-all w-full whitespace-nowrap"
                 style={{ filter: 'drop-shadow(0 0 8px hsl(270 100% 59% / 0.5))' }}
