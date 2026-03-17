@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StarfieldBackground from '@/components/StarfieldBackground';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import PixelButton from '@/components/PixelButton';
+
+const API_URL = 'http://localhost:5000/api';
 
 const Register = () => {
   const navigate = useNavigate();
@@ -11,8 +14,9 @@ const Register = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const newErrors: Record<string, string> = {};
     if (!teamName.trim()) newErrors.teamName = 'Team name is required';
     if (!password.trim()) newErrors.password = 'Password is required';
@@ -20,8 +24,44 @@ const Register = () => {
       setErrors(newErrors);
       return;
     }
-    localStorage.setItem('cc_team', JSON.stringify({ teamName, password, round: '1' }));
-    navigate('/waiting-room');
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/users/auth`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ email: teamName, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        toast.success('Access granted, Cadet!');
+        
+        // Store user and team info
+        const userData = {
+          ...data.user,
+          teamName: data.user.team?.teamName || teamName,
+          round: data.user.team?.round || '1',
+          teamId: data.user.team?._id
+        };
+        
+        localStorage.setItem('cc_user', JSON.stringify(data.user));
+        localStorage.setItem('cc_team', JSON.stringify(userData));
+        
+        navigate('/waiting-room');
+      } else {
+        toast.error(data.message || 'Authentication failed');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error('Connection to command center failed');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const inputClass = 'w-full bg-[#060612] border-2 border-muted-foreground/20 text-foreground font-mono-tech px-3 py-[10px] outline-none transition-all focus:border-primary focus:shadow-[0_0_8px_rgba(0,245,255,0.3)]';
@@ -45,6 +85,7 @@ const Register = () => {
                 value={teamName}
                 onChange={e => { setTeamName(e.target.value); setErrors(p => ({ ...p, teamName: '' })); }}
                 placeholder="Enter team name"
+                disabled={isLoading}
               />
               {errors.teamName && <p className="font-pixel text-[7px] text-destructive mt-1">{errors.teamName}</p>}
             </div>
@@ -58,6 +99,7 @@ const Register = () => {
                   value={password}
                   onChange={e => { setPassword(e.target.value); setErrors(p => ({ ...p, password: '' })); }}
                   placeholder="Enter password"
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
@@ -73,10 +115,18 @@ const Register = () => {
 
             <button
               onClick={handleSubmit}
-              className="w-full font-pixel text-[10px] text-foreground py-[14px] bg-accent border-2 border-accent/60 hover:bg-accent/80 transition-all"
+              disabled={isLoading}
+              className="w-full font-pixel text-[10px] text-foreground py-[14px] bg-accent border-2 border-accent/60 hover:bg-accent/80 transition-all flex items-center justify-center gap-2"
               style={{ filter: 'drop-shadow(0 0 8px hsl(270 100% 59% / 0.5))' }}
             >
-              [ ENTER WAITING ROOM ]
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  [ PROCESSING... ]
+                </>
+              ) : (
+                '[ ENTER WAITING ROOM ]'
+              )}
             </button>
 
           </div>

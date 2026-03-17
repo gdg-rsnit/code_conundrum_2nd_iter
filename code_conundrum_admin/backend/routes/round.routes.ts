@@ -16,9 +16,9 @@ import {
 const router = express.Router();
 
 // CRUD operations
-router.route("/").post(authenticate, authorizeAdmin, createRound).get(authenticate, authorizeAdmin, getRounds);
+router.route("/").post(authenticate, authorizeAdmin, createRound).get(authenticate, getRounds);
 router.route("/:roundId")
-    .get(authenticate, authorizeAdmin, getRoundById)
+    .get(authenticate, getRoundById)
     .patch(authenticate, authorizeAdmin, updateRound)
     .delete(authenticate, authorizeAdmin, deleteRound);
 
