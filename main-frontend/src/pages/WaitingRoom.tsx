@@ -1,18 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import StarfieldBackground from '@/components/StarfieldBackground';
-import PixelProgressBar from '@/components/PixelProgressBar';
-import MarqueeStrip from '@/components/MarqueeStrip';
-import GdgLogo from '@/components/GdgLogo';
 import PixelRadar from '@/components/PixelRadar';
+import MarqueeStrip from '@/components/MarqueeStrip';
 import { X } from 'lucide-react';
 
 const WaitingRoom = () => {
   const navigate = useNavigate();
   const [flashing, setFlashing] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
-
-  const [adminRound, setAdminRound] = useState('1');
 
   useEffect(() => {
     const handleGlobalClick = (e: MouseEvent) => {
@@ -37,17 +33,10 @@ const WaitingRoom = () => {
     { num: '06', title: 'NO INTER-TEAM COMMUNICATION', desc: 'Discussing answers or signaling other teams during a round is grounds for disqualification.' },
   ];
 
-
-
   const stored = localStorage.getItem('cc_team');
   const team = stored ? JSON.parse(stored) : { teamName: 'UNNAMED', round: '1' };
 
   const handleSimulate = () => {
-    setFlashing(true);
-    setTimeout(() => navigate('/countdown'), 400);
-  };
-
-  const handleLaunch = () => {
     setFlashing(true);
     setTimeout(() => navigate('/countdown'), 400);
   };
