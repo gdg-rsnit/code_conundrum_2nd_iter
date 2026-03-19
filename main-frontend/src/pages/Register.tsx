@@ -38,6 +38,19 @@ const Register = () => {
 
       const data = await response.json();
 
+      if (response.status === 403) {
+        const existingTeamRaw = localStorage.getItem('cc_team');
+        const existingTeam = existingTeamRaw ? JSON.parse(existingTeamRaw) : {};
+        localStorage.setItem('cc_team', JSON.stringify({
+          ...existingTeam,
+          teamName,
+          banned: true,
+        }));
+        toast.error(data.message || 'Your team is banned.');
+        navigate('/banned');
+        return;
+      }
+
       if (response.ok && data.success) {
         toast.success('Access granted, Cadet!');
         

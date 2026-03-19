@@ -8,6 +8,7 @@ import QuestionsPanel from "./components/QuestionsPanel";
 import TeamsPanel from "./components/TeamsPanel";
 import UsersPanel from "./components/UsersPanel";
 import LeaderboardPanel from "./components/LeaderboardPanel";
+import MonitoringPanel from "./components/MonitoringPanel";
 import ProtectedRoute from "./routes/ProtectedRoute";
 import LoginPage from "./pages/LoginPage";
 import UserHomePage from "./pages/UserHomePage";
@@ -104,10 +105,7 @@ export default function App() {
             <Route path="/teams" element={<TeamsPanel />} />
             <Route path="/users" element={<UsersPanel />} />
             <Route path="/leaderboard" element={<LeaderboardPanel />} />
-            <Route
-              path="/monitoring"
-              element={<PlaceholderPanel icon="📊" title="Live Monitoring Dashboard" subtitle="Connect backend monitoring endpoint and websocket stream." />}
-            />
+            <Route path="/monitoring" element={<MonitoringPanel />} />
           </Route>
         </Route>
 

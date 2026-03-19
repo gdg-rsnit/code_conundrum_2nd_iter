@@ -96,7 +96,7 @@ const Index = () => {
         <div className="flex flex-col sm:flex-row gap-4 items-center">
           <Link to="/register">
             <PixelButton variant="primary" pixelSize="lg">
-              START CONTEST
+              JOIN CONTEST
             </PixelButton>
           </Link>
         </div>

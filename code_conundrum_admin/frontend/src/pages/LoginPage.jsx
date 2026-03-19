@@ -4,6 +4,16 @@ import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { useLogin } from "../hooks/authHook";
 
+const DEFAULT_SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+
+const getSessionDurationMs = () => {
+  const parsed = Number(import.meta.env.VITE_AUTH_SESSION_MS);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return parsed;
+  }
+  return DEFAULT_SESSION_DURATION_MS;
+};
+
 export default function LoginPage() {
   const [mode, setMode] = useState("ADMIN");
   const [email, setEmail] = useState("");
@@ -13,6 +23,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const loginMutation = useLogin();
+  const sessionDurationMs = getSessionDurationMs();
 
   const from = location.state?.from?.pathname;
 
@@ -37,10 +48,10 @@ export default function LoginPage() {
         throw new Error("Use Admin mode for this account");
       }
 
-      // Store user with expiry timestamp (3 hours to match backend JWT)
+      // Persist UI auth state with a configurable TTL.
       const authData = {
         user: loggedInUser,
-        expiresAt: Date.now() + (3 * 60 * 60 * 1000) // 3 hours in milliseconds
+        expiresAt: Date.now() + sessionDurationMs
       };
       
       setUser(loggedInUser);

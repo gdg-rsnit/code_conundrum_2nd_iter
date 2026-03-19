@@ -36,7 +36,8 @@ export const loginUserSchema = z.object({
   email: z
   .email("Invalid email address")
   .trim()
-  .toLowerCase(),
+  .toLowerCase()
+  .min(1, "Email or team name is required"),
   password: z.string().min(1, "Password is required"),
 });
 

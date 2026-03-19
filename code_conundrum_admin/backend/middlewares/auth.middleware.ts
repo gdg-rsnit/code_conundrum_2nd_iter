@@ -1,5 +1,6 @@
 import jwt, { type JwtPayload } from "jsonwebtoken";
 import {User, type IUser} from "../models/userModel.js"
+import { Team } from "../models/teamModel.js";
 import asyncHandler from "../middlewares/asyncHandler.middleware.js";
 import type { Request, Response, NextFunction } from "express";
 
@@ -23,6 +24,23 @@ const authenticate=asyncHandler(async(req:AuthRequest,res:Response,next:NextFunc
             if (!req.user){
                 res.status(401);
                 throw new Error("Not authorized , user not found");
+            }
+
+            if (req.user.role === "TEAM") {
+                if (req.user.banned) {
+                    res.cookie("jwt", "", { httpOnly: true, expires: new Date(0) });
+                    res.status(403).json({ success: false, message: "Team is banned" });
+                    return;
+                }
+
+                if (req.user.teamId) {
+                    const team = await Team.findById(req.user.teamId).select("banned").lean();
+                    if (team?.banned) {
+                        res.cookie("jwt", "", { httpOnly: true, expires: new Date(0) });
+                        res.status(403).json({ success: false, message: "Team is banned" });
+                        return;
+                    }
+                }
             }
             next();
         } catch (error) {

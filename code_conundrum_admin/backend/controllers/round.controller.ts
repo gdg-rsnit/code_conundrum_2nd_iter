@@ -8,6 +8,25 @@ import { Submission } from "../models/submissionModel.js";
 import { Penalty } from "../models/penaltyModel.js";
 import { Answer } from "../models/answerModel.js";
 
+const autoEndExpiredLiveRounds = async () => {
+    const now = new Date();
+    await Round.updateMany(
+        {
+            status: "LIVE",
+            isPaused: false,
+            endTime: { $ne: null, $lte: now }
+        },
+        {
+            $set: {
+                status: "ENDED",
+                submissionLocked: true,
+                isPaused: false,
+                pauseStartAt: null
+            }
+        }
+    );
+};
+
 const createRound = asyncHandler(async (req: Request, res: Response) => {
     const result = createRoundSchema.safeParse(req.body);
 
@@ -31,6 +50,7 @@ const createRound = asyncHandler(async (req: Request, res: Response) => {
 })
 
 const getRounds = asyncHandler(async (req: Request, res: Response) => {
+    await autoEndExpiredLiveRounds();
     const rounds = await Round.find({}).sort({createdAt:-1})
     if (!rounds) {
         throw new Error("Round not found")
@@ -40,6 +60,7 @@ const getRounds = asyncHandler(async (req: Request, res: Response) => {
 
 const getRoundById=asyncHandler(async(req:Request,res:Response)=>{
     const {roundId}=req.params;
+    await autoEndExpiredLiveRounds();
     const round=await Round.findById(roundId);
     if(!round){
         res.status(404);

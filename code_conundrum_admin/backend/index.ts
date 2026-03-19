@@ -12,6 +12,7 @@ import questionRoutes from "./routes/question.routes.js";
 import answerRoutes from "./routes/answer.routes.js";
 import leaderboardRoutes from "./routes/leaderboard.routes.js";
 import submissionRoutes from "./routes/submission.routes.js";
+import monitorRoutes from "./routes/monitor.routes.js";
 
 dotenv.config();
 const port = process.env.PORT || 5000;
@@ -53,5 +54,6 @@ app.use("/api/admin/questions", questionRoutes);
 app.use("/api/admin/answers", answerRoutes);
 app.use("/api/admin/leaderboard", leaderboardRoutes);
 app.use("/api/submissions", submissionRoutes);
+app.use("/api", monitorRoutes);
 
 app.listen(port, () => console.log(`app running on port ${port}`));
