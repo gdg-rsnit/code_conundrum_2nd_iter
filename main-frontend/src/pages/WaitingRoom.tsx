@@ -52,6 +52,7 @@ const WaitingRoom = () => {
 
   const stored = localStorage.getItem('cc_team');
   const team = stored ? JSON.parse(stored) : { teamName: 'UNNAMED', round: '1' };
+  const [nextRoundNumber, setNextRoundNumber] = useState<number>(Number(team.round) || 1);
 
   useEffect(() => {
     const checkLiveRound = async () => {
@@ -76,6 +77,10 @@ const WaitingRoom = () => {
         if (!response.ok) return;
 
         const data = await response.json();
+        const rounds = Array.isArray(data?.data) ? data.data : [];
+        const endedRoundsCount = rounds.filter((r: any) => r.status === 'ENDED').length;
+        setNextRoundNumber(endedRoundsCount + 1);
+
         const liveRound = data?.data?.find((r: any) => r.status === 'LIVE');
         
         // Check if a previously LIVE round has been reset to DRAFT
@@ -206,7 +211,7 @@ const WaitingRoom = () => {
           </h2>
 
           <p className="font-mono-tech text-[13px] text-muted-foreground/60 mb-6">
-            Waiting for organizer to initiate Round {team.round}
+            Waiting for organizer to initiate Round {nextRoundNumber}
             <span className="animate-blink-cursor">...</span>
           </p>
 
@@ -216,7 +221,7 @@ const WaitingRoom = () => {
               TEAM: {team.teamName.toUpperCase()}
             </span>
             <span className="font-pixel text-[8px] px-[14px] py-2 bg-space-navy border-2 border-accent text-accent">
-              ROUND: 0{team.round}
+              ROUND: {String(nextRoundNumber).padStart(2, '0')}
             </span>
             <span className="font-pixel text-[8px] px-[14px] py-2 bg-space-navy border-2 border-[#22C55E] text-[#22C55E]">
               STATUS: READY
