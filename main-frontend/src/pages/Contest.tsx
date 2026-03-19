@@ -5,8 +5,21 @@ import PixelBadge from '@/components/PixelBadge';
 import { cn } from '@/lib/utils';
 import { Maximize2, Loader2, Minimize2 } from 'lucide-react';
 import { toast } from 'sonner';
+import useMonitoring from '@/hooks/useMonitoring';
 
 const API_URL = 'http://localhost:5000/api';
+
+const markTeamAsBanned = () => {
+  const teamRaw = localStorage.getItem('cc_team');
+  if (!teamRaw) return;
+  try {
+    const parsed = JSON.parse(teamRaw);
+    parsed.banned = true;
+    localStorage.setItem('cc_team', JSON.stringify(parsed));
+  } catch {
+    // ignore parse errors
+  }
+};
 
 const shuffleArray = <T,>(arr: T[]): T[] => {
   const next = [...arr];
@@ -36,9 +49,21 @@ const Contest = () => {
   const [expandedProblem, setExpandedProblem] = useState<{title: string, content: string} | null>(null);
   const [expandedSnippet, setExpandedSnippet] = useState<{title: string, content: string, htmlContent: any} | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval>>();
+  const fullscreenWasActiveRef = useRef<boolean>(Boolean(document.fullscreenElement));
 
   const stored = localStorage.getItem('cc_team');
   const team = stored ? JSON.parse(stored) : { teamName: 'TEAM', round: '1' };
+  const {
+    fullscreenExitCount,
+    tabSwitchCount,
+    warning,
+    clearWarning,
+    trackFullscreenExit,
+  } = useMonitoring({
+    teamId: team?.teamId,
+    contestId: liveRoundId,
+    enabled: !locked,
+  });
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -55,6 +80,12 @@ const Contest = () => {
   // Request fullscreen when contest loads
   useEffect(() => {
     if (!isLoading) {
+      if (document.fullscreenElement) {
+        setIsFullscreen(true);
+        fullscreenWasActiveRef.current = true;
+        return;
+      }
+
       let retryCount = 0;
       const maxRetries = 3;
       
@@ -63,6 +94,7 @@ const Contest = () => {
           .then(() => {
             console.log('Fullscreen activated successfully');
             setIsFullscreen(true);
+            fullscreenWasActiveRef.current = true;
           })
           .catch(err => {
             console.warn(`Fullscreen request failed (attempt ${retryCount + 1}):`, err.message);
@@ -86,11 +118,14 @@ const Contest = () => {
   // Prevent accidental fullscreen exit
   useEffect(() => {
     const handleFullscreenChange = () => {
+      const wasFullscreen = fullscreenWasActiveRef.current;
       const isNowFullscreen = !!document.fullscreenElement;
       setIsFullscreen(isNowFullscreen);
+      fullscreenWasActiveRef.current = isNowFullscreen;
       
       // Re-enter fullscreen if user tries to exit before submission
-      if (!isNowFullscreen && !allowExitFullscreen) {
+      if (wasFullscreen && !isNowFullscreen && !allowExitFullscreen) {
+        trackFullscreenExit();
         setTimeout(() => {
           document.documentElement.requestFullscreen().catch(() => {});
         }, 100);
@@ -111,7 +146,7 @@ const Contest = () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [allowExitFullscreen, isFullscreen]);
+  }, [allowExitFullscreen, isFullscreen, trackFullscreenExit]);
 
   // Cleanup: exit fullscreen when component unmounts or navigation happens
   useEffect(() => {
@@ -134,6 +169,16 @@ const Contest = () => {
 
         // 1. Get Live Round
         const roundRes = await fetch(`${API_URL}/admin/round`, { credentials: 'include' });
+        if (roundRes.status === 403) {
+          markTeamAsBanned();
+          toast.error('Your team is banned and cannot enter the contest.');
+          navigate('/banned');
+          return;
+        }
+        if (roundRes.status === 401) {
+          navigate('/home');
+          return;
+        }
         const roundData = await roundRes.json();
         const liveRound = roundData.data.find((r: any) => r.status === 'LIVE');
 
@@ -166,6 +211,16 @@ const Contest = () => {
             `${API_URL}/submissions?teamId=${team.teamId}&roundId=${liveRound._id}`,
             { credentials: 'include' }
           );
+          if (submissionRes.status === 403) {
+            markTeamAsBanned();
+            toast.error('Your team is banned and cannot enter the contest.');
+            navigate('/banned');
+            return;
+          }
+          if (submissionRes.status === 401) {
+            navigate('/home');
+            return;
+          }
           const submissionData = await submissionRes.json().catch(() => ({}));
           if (submissionRes.ok && Array.isArray(submissionData?.data) && submissionData.data.length > 0) {
             const existing = submissionData.data[0];
@@ -190,10 +245,30 @@ const Contest = () => {
 
         // 3. Get Questions
         const qRes = await fetch(`${API_URL}/admin/questions/round/${liveRound._id}`, { credentials: 'include' });
+        if (qRes.status === 403) {
+          markTeamAsBanned();
+          toast.error('Your team is banned and cannot enter the contest.');
+          navigate('/banned');
+          return;
+        }
+        if (qRes.status === 401) {
+          navigate('/home');
+          return;
+        }
         const qData = await qRes.json();
         
         // 4. Get Answers (Snippets)
         const aRes = await fetch(`${API_URL}/admin/answers/round/${liveRound._id}`, { credentials: 'include' });
+        if (aRes.status === 403) {
+          markTeamAsBanned();
+          toast.error('Your team is banned and cannot enter the contest.');
+          navigate('/banned');
+          return;
+        }
+        if (aRes.status === 401) {
+          navigate('/home');
+          return;
+        }
         const aData = await aRes.json();
 
         const shuffledQuestions = shuffleArray(qData.data || []);
@@ -230,6 +305,16 @@ const Contest = () => {
     const syncTimer = async () => {
       try {
         const roundRes = await fetch(`${API_URL}/admin/round`, { credentials: 'include' });
+        if (roundRes.status === 403) {
+          markTeamAsBanned();
+          toast.error('Your team is banned and cannot enter the contest.');
+          navigate('/banned');
+          return;
+        }
+        if (roundRes.status === 401) {
+          navigate('/home');
+          return;
+        }
         const roundData = await roundRes.json();
         const liveRound = roundData.data.find((r: any) => r._id === liveRoundId);
 
@@ -392,6 +477,17 @@ const Contest = () => {
         body: JSON.stringify(payload),
       });
 
+      if (response.status === 403) {
+        markTeamAsBanned();
+        toast.error('Your team is banned and cannot enter the contest.');
+        navigate('/banned');
+        return;
+      }
+      if (response.status === 401) {
+        navigate('/home');
+        return;
+      }
+
       const responseData = await response.json().catch(() => ({}));
 
       if (!response.ok) {
@@ -473,6 +569,12 @@ const Contest = () => {
             <span className="font-pixel text-[8px] text-muted-foreground">
               MATCHED: {matchedCount}/{questions.length}
             </span>
+            <span className="hidden sm:inline font-pixel text-[8px] text-destructive/90">
+              FS EXIT: {fullscreenExitCount}
+            </span>
+            <span className="hidden sm:inline font-pixel text-[8px] text-accent/90">
+              TAB SWITCH: {tabSwitchCount}
+            </span>
             <button
               onClick={() => handleSubmit('manual')}
               disabled={locked}
@@ -526,15 +628,21 @@ const Contest = () => {
                 className="bg-space-navy border border-muted-foreground/10 p-4"
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={() => handleDrop(p.id)}
-                onClick={() => handleTapAssign(p.id)}
               >
                 <div className="flex items-start gap-3 mb-3">
                   <div className="w-8 h-8 flex-shrink-0 border-2 border-primary flex items-center justify-center cursor-pointer hover:bg-primary/20 transition-colors" onClick={() => setExpandedProblem({ title: `PROBLEM ${p.label}`, content: p.text })}>
                     <span className="font-pixel text-[8px] text-primary">{p.label}</span>
                   </div>
-                  <span className="flex-1 text-xs text-muted-foreground font-mono-tech leading-relaxed cursor-pointer hover:text-primary transition-colors" onClick={() => setExpandedProblem({ title: `PROBLEM ${p.label}`, content: p.text })}>
-                    {p.text}
-                  </span>
+                  <button
+                    type="button"
+                    className="flex-1 text-left"
+                    onClick={() => setExpandedProblem({ title: `PROBLEM ${p.label}`, content: p.text })}
+                    title="Open full question"
+                  >
+                    <span className="block text-xs text-muted-foreground font-mono-tech leading-relaxed hover:text-primary transition-colors max-h-20 overflow-y-auto pr-1">
+                      {p.text}
+                    </span>
+                  </button>
                 </div>
 
                 {/* Drop Zone */}
@@ -556,8 +664,20 @@ const Contest = () => {
                         [X]
                       </button>
                     )}
+                    {!locked && selectedSnippet && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTapAssign(p.id);
+                        }}
+                        className="absolute top-1 right-8 z-10 font-pixel text-[8px] text-primary hover:text-primary/80"
+                      >
+                        [SET]
+                      </button>
+                    )}
                     <PixelBadge variant="cyan" className="mb-2">{getSnippet(assignments[p.id])?.label}</PixelBadge>
-                    <pre className="text-[10px] text-muted-foreground font-mono-tech whitespace-pre-wrap">
+                    <pre className="text-[10px] text-muted-foreground font-mono-tech whitespace-pre-wrap max-h-28 overflow-y-auto pr-1">
                       {highlightCode(getSnippet(assignments[p.id])?.code || '')}
                     </pre>
                   </div>
@@ -566,7 +686,7 @@ const Contest = () => {
                     'border-2 border-dashed border-muted-foreground/20 min-h-[48px] flex items-center justify-center transition-all',
                     dragging && 'border-primary border-solid animate-pulse-glow',
                     selectedSnippet && 'border-primary/60 bg-primary/5'
-                  )}>
+                  )} onClick={() => handleTapAssign(p.id)}>
                     <span className="font-mono-tech text-[10px] text-muted-foreground/40">
                       {selectedSnippet ? '[ TAP TO ASSIGN ]' : '[ DROP CODE HERE ]'}
                     </span>
@@ -630,7 +750,7 @@ const Contest = () => {
                   draggable={!deployed && !locked}
                   onDragStart={() => handleDragStart(s.id)}
                   onDragEnd={() => setDragging(null)}
-                  onClick={() => !deployed && !locked && setSelectedSnippet(selected ? null : s.id)}
+                  onClick={() => setExpandedSnippet({ title: s.label, content: s.code, htmlContent: highlightCode(s.code) })}
                   className={cn(
                     'bg-[#060612] p-3 border-2 border-accent/40 cursor-grab transition-all',
                     deployed && 'opacity-40 cursor-default',
@@ -650,6 +770,19 @@ const Contest = () => {
                       {selected && (
                         <span className="font-pixel text-[7px] text-primary animate-blink-cursor">SELECTED</span>
                       )}
+                      {!deployed && !locked && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedSnippet(selected ? null : s.id);
+                          }}
+                          className="font-pixel text-[7px] text-primary hover:text-primary/80"
+                          title={selected ? 'Unselect snippet' : 'Select snippet'}
+                        >
+                          {selected ? '[UNSELECT]' : '[SELECT]'}
+                        </button>
+                      )}
                       <button
                         title="Expand Answer"
                         onClick={(e) => { e.stopPropagation(); setExpandedSnippet({ title: s.label, content: s.code, htmlContent: highlightCode(s.code) }); }}
@@ -660,7 +793,7 @@ const Contest = () => {
                       </button>
                     </div>
                   </div>
-                  <pre className="text-[11px] font-mono-tech whitespace-pre-wrap leading-relaxed text-muted-foreground">
+                  <pre className="text-[11px] font-mono-tech whitespace-pre-wrap leading-relaxed text-muted-foreground max-h-32 overflow-y-auto pr-1">
                     {highlightCode(s.code)}
                   </pre>
                 </div>
@@ -684,6 +817,21 @@ const Contest = () => {
           )}
         </div>
       </div>
+
+      {warning && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-lg border-2 border-destructive bg-space-navy p-6">
+            <h3 className="font-pixel text-[11px] text-destructive mb-3">[ SECURITY WARNING ]</h3>
+            <p className="font-mono-tech text-sm text-foreground leading-relaxed">{warning}</p>
+            <button
+              onClick={clearWarning}
+              className="mt-5 w-full border-2 border-destructive/70 py-2 font-pixel text-[9px] text-destructive hover:bg-destructive/10 transition-colors"
+            >
+              [ ACKNOWLEDGE ]
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

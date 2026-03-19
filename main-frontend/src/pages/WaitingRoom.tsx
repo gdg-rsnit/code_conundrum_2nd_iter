@@ -4,14 +4,28 @@ import StarfieldBackground from '@/components/StarfieldBackground';
 import PixelRadar from '@/components/PixelRadar';
 import MarqueeStrip from '@/components/MarqueeStrip';
 import { X } from 'lucide-react';
+import { toast } from 'sonner';
 
 const API_URL = 'http://localhost:5000/api';
+
+const markTeamAsBanned = () => {
+  const teamRaw = localStorage.getItem('cc_team');
+  if (!teamRaw) return;
+  try {
+    const parsed = JSON.parse(teamRaw);
+    parsed.banned = true;
+    localStorage.setItem('cc_team', JSON.stringify(parsed));
+  } catch {
+    // ignore parse errors
+  }
+};
 
 const WaitingRoom = () => {
   const navigate = useNavigate();
   const [flashing, setFlashing] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const hasNavigatedRef = useRef(false);
+  const bannedBlockedRef = useRef(false);
 
   useEffect(() => {
     const handleGlobalClick = (e: MouseEvent) => {
@@ -42,9 +56,23 @@ const WaitingRoom = () => {
   useEffect(() => {
     const checkLiveRound = async () => {
       if (hasNavigatedRef.current) return;
+      if (bannedBlockedRef.current) return;
 
       try {
         const response = await fetch(`${API_URL}/admin/round`, { credentials: 'include' });
+        if (response.status === 403) {
+          if (!bannedBlockedRef.current) {
+            bannedBlockedRef.current = true;
+            markTeamAsBanned();
+            toast.error('Your team is banned and cannot enter the contest.');
+            navigate('/banned');
+          }
+          return;
+        }
+        if (response.status === 401) {
+          navigate('/home');
+          return;
+        }
         if (!response.ok) return;
 
         const data = await response.json();
@@ -79,6 +107,10 @@ const WaitingRoom = () => {
 
         hasNavigatedRef.current = true;
         setFlashing(true);
+
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen().catch(() => {});
+        }
 
         const now = Date.now();
         const startAt = new Date(liveRound.startTime).getTime();

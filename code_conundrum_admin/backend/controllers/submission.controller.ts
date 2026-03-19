@@ -32,6 +32,31 @@ export const createOrUpdateSubmission = asyncHandler(async (
   if (!round) {
     return res.status(404).json({ success: false, message: 'Round not found' })
   }
+
+  const now = Date.now()
+  const roundEndTime = round.endTime ? new Date(round.endTime).getTime() : null
+  const hasExpired = Boolean(roundEndTime && now >= roundEndTime)
+
+  if (round.status === 'LIVE' && !round.isPaused && hasExpired) {
+    await Round.findByIdAndUpdate(roundId, {
+      $set: {
+        status: 'ENDED',
+        submissionLocked: true,
+        isPaused: false,
+        pauseStartAt: null,
+      },
+    })
+    return res.status(400).json({ success: false, message: 'Round has ended' })
+  }
+
+  if (round.status !== 'LIVE' || round.submissionLocked) {
+    return res.status(400).json({ success: false, message: 'Round is not accepting submissions' })
+  }
+
+  if (round.startTime && now < new Date(round.startTime).getTime()) {
+    return res.status(400).json({ success: false, message: 'Round has not started yet' })
+  }
+
   const boundedTimeTaken = Math.min(timeSeconds, round.duration)
 
   const team = await Team.findById(teamId).lean()

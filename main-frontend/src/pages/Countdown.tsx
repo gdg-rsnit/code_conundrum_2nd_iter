@@ -50,14 +50,12 @@ const Countdown = () => {
     }
   }, [navigate]);
 
-  // Enter fullscreen on mount, exit on unmount
+  // Enter fullscreen on mount and preserve it for Contest transition
   useEffect(() => {
     const el = document.documentElement;
-    if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
-    return () => {
-      if (document.fullscreenElement && document.exitFullscreen)
-        document.exitFullscreen().catch(() => {});
-    };
+    if (!document.fullscreenElement && el.requestFullscreen) {
+      el.requestFullscreen().catch(() => {});
+    }
   }, []);
 
   // Init audio context

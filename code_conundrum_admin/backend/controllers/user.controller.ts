@@ -43,6 +43,13 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
     return res.status(403).json({ success: false, message: "This account has been banned" });
   }
 
+  if (existingUser.role === "TEAM" && existingUser.teamId) {
+    const linkedTeam = await Team.findById(existingUser.teamId).select("banned").lean();
+    if (linkedTeam?.banned) {
+      return res.status(403).json({ success: false, message: "This team has been banned" });
+    }
+  }
+
   createToken(res, existingUser._id.toString());
 
   // If it's a TEAM user, we might want to include team info
