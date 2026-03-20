@@ -23,8 +23,11 @@ export const useGetAllTeams = () => {
     return useQuery({
         queryFn: getAllTeamsRequest,
         queryKey: ["getAllTeams"],
-        staleTime: 5 * 60 * 1000,
-        gcTime: 10 * 60 * 1000,
+        staleTime: 0,
+        gcTime: 2 * 60 * 1000,
+        refetchOnMount: "always",
+        refetchOnWindowFocus: true,
+        refetchOnReconnect: true,
         retry: 1,
         select: (data) => data.data,
     });
@@ -34,8 +37,11 @@ export const useGetBannedTeams = () =>{
     return useQuery({
         queryKey: ["getBannedTeams"],
         queryFn: getBannedTeamsRequest,
-        staleTime: 5 * 60 * 1000,
-        gcTime: 10 * 60 * 1000,
+        staleTime: 0,
+        gcTime: 2 * 60 * 1000,
+        refetchOnMount: "always",
+        refetchOnWindowFocus: true,
+        refetchOnReconnect: true,
         retry: 1,
         select: (data) => data.data,
     });

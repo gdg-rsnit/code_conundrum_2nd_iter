@@ -7,6 +7,7 @@ import {
   logFullscreenExit,
   logTabSwitch,
   penalizeTeamByAdmin,
+  clearAllLogsHandler,
 } from "../controllers/monitoring.controller.js";
 
 const router = express.Router();
@@ -18,5 +19,6 @@ router.get("/admin/monitoring", authenticate, authorizeAdmin, fetchMonitoringSum
 router.get("/admin/monitoring/logs", authenticate, authorizeAdmin, fetchMonitoringLogs);
 router.post("/admin/ban-team", authenticate, authorizeAdmin, banTeamByAdmin);
 router.post("/admin/penalize-team", authenticate, authorizeAdmin, penalizeTeamByAdmin);
+router.post("/admin/clear-logs", authenticate, authorizeAdmin, clearAllLogsHandler);
 
 export default router;

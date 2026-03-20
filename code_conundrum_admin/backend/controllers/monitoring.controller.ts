@@ -12,6 +12,7 @@ import {
   getMonitoringSummary,
   penalizeTeam,
   recordMonitoringEvent,
+  clearAllLogs,
 } from "../services/monitoring.service.js";
 
 type AuthenticatedRequest = Request & {
@@ -40,12 +41,19 @@ export const logFullscreenExit = asyncHandler(async (req: AuthenticatedRequest, 
   }
 
   const body = parsed.data;
-  if (req.user?.role === "TEAM" && req.user.teamId && String(req.user.teamId) !== body.teamId) {
-    return res.status(403).json({ success: false, message: "Not allowed to log event for another team" });
+  const effectiveTeamId =
+    req.user?.role === "TEAM"
+      ? req.user.teamId
+        ? String(req.user.teamId)
+        : null
+      : body.teamId;
+
+  if (!effectiveTeamId) {
+    return res.status(403).json({ success: false, message: "Team mapping missing for current user" });
   }
 
   const result = await recordMonitoringEvent({
-    teamId: body.teamId,
+    teamId: effectiveTeamId,
     contestId: body.contestId,
     eventType: "fullscreen_exit",
     ...(body.timestamp ? { timestamp: body.timestamp } : {}),
@@ -57,7 +65,7 @@ export const logFullscreenExit = asyncHandler(async (req: AuthenticatedRequest, 
     success: true,
     message: "Fullscreen exit logged",
     data: {
-      teamId: body.teamId,
+      teamId: effectiveTeamId,
       contestId: body.contestId,
       fullscreenExitCount: result.summary.fullscreenExitCount,
       tabSwitchCount: result.summary.tabSwitchCount,
@@ -74,12 +82,19 @@ export const logTabSwitch = asyncHandler(async (req: AuthenticatedRequest, res: 
   }
 
   const body = parsed.data;
-  if (req.user?.role === "TEAM" && req.user.teamId && String(req.user.teamId) !== body.teamId) {
-    return res.status(403).json({ success: false, message: "Not allowed to log event for another team" });
+  const effectiveTeamId =
+    req.user?.role === "TEAM"
+      ? req.user.teamId
+        ? String(req.user.teamId)
+        : null
+      : body.teamId;
+
+  if (!effectiveTeamId) {
+    return res.status(403).json({ success: false, message: "Team mapping missing for current user" });
   }
 
   const result = await recordMonitoringEvent({
-    teamId: body.teamId,
+    teamId: effectiveTeamId,
     contestId: body.contestId,
     eventType: "tab_switch",
     ...(body.timestamp ? { timestamp: body.timestamp } : {}),
@@ -91,7 +106,7 @@ export const logTabSwitch = asyncHandler(async (req: AuthenticatedRequest, res: 
     success: true,
     message: "Tab switch logged",
     data: {
-      teamId: body.teamId,
+      teamId: effectiveTeamId,
       contestId: body.contestId,
       fullscreenExitCount: result.summary.fullscreenExitCount,
       tabSwitchCount: result.summary.tabSwitchCount,
@@ -151,6 +166,16 @@ export const penalizeTeamByAdmin = asyncHandler(async (req: Request, res: Respon
   return res.status(200).json({
     success: true,
     message: "Penalty applied successfully",
+    data: result,
+  });
+});
+
+export const clearAllLogsHandler = asyncHandler(async (req: Request, res: Response) => {
+  const result = await clearAllLogs();
+
+  return res.status(200).json({
+    success: true,
+    message: "All monitoring logs cleared successfully",
     data: result,
   });
 });

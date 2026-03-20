@@ -17,9 +17,12 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async () => {
+    const normalizedTeamName = teamName.trim();
+    const normalizedPassword = password.trim();
+
     const newErrors: Record<string, string> = {};
-    if (!teamName.trim()) newErrors.teamName = 'Team name is required';
-    if (!password.trim()) newErrors.password = 'Password is required';
+    if (!normalizedTeamName) newErrors.teamName = 'Team name is required';
+    if (!normalizedPassword) newErrors.password = 'Password is required';
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -33,7 +36,7 @@ const Register = () => {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ email: teamName, password }),
+        body: JSON.stringify({ email: normalizedTeamName, password: normalizedPassword }),
       });
 
       const data = await response.json();
@@ -43,7 +46,7 @@ const Register = () => {
         const existingTeam = existingTeamRaw ? JSON.parse(existingTeamRaw) : {};
         localStorage.setItem('cc_team', JSON.stringify({
           ...existingTeam,
-          teamName,
+          teamName: normalizedTeamName,
           banned: true,
         }));
         toast.error(data.message || 'Your team is banned.');
@@ -57,7 +60,7 @@ const Register = () => {
         // Store user and team info
         const userData = {
           ...data.user,
-          teamName: data.user.team?.teamName || teamName,
+          teamName: data.user.team?.teamName || normalizedTeamName,
           round: data.user.team?.round || '1',
           teamId: data.user.team?._id
         };

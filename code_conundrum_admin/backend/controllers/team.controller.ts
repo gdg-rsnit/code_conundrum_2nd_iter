@@ -1,6 +1,7 @@
 import asyncHandler from "../middlewares/asyncHandler.middleware.js";
 import type { Request, Response } from "express";
 import { Team, type ITeam } from "../models/teamModel.js";
+import { User } from "../models/userModel.js";
 import { Penalty, type IPenalty } from "../models/penaltyModel.js";
 import { createPenaltySchema, updatePenaltySchema } from "../../schemas/penaltySchema.js";
 import { ZodError } from "zod";
@@ -11,6 +12,7 @@ import { TeamRound } from "../models/teamRoundModel.js";
 const updateTeamStatus = asyncHandler(async (req: Request, res: Response) => {
     const { teamId } = req.params;
     const { banned } = req.body;
+    const bannedAt = banned ? new Date() : null;
 
     if (typeof banned !== "boolean") {
         return res.status(400).json({
@@ -23,7 +25,7 @@ const updateTeamStatus = asyncHandler(async (req: Request, res: Response) => {
         teamId,
         {
             banned,
-            bannedAt: banned ? new Date() : null
+            bannedAt
         },
         { new: true }
     );
@@ -34,6 +36,11 @@ const updateTeamStatus = asyncHandler(async (req: Request, res: Response) => {
             message: "Team not found",
         });
     }
+
+    await User.updateMany(
+        { teamId: team._id, role: "TEAM" },
+        { banned, bannedAt }
+    );
 
     res.status(200).json({
         data: team,

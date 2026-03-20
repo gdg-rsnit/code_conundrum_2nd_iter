@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { useBanTeam, useMonitoringLogs, useMonitoringSummary, usePenalizeTeam } from "../hooks/monitoringHook.js";
+import { useBanTeam, useMonitoringLogs, useMonitoringSummary, usePenalizeTeam, useClearAllLogs } from "../hooks/monitoringHook.js";
 
 const formatDateTime = (value) => {
   if (!value) return "-";
@@ -13,8 +13,13 @@ export default function MonitoringPanel() {
   const [selected, setSelected] = useState({ teamId: "", contestId: "" });
   const [penaltyForm, setPenaltyForm] = useState({ scoreDeducted: "10", timeDeducted: "0", reason: "Fullscreen exit policy violation" });
 
-  const { data: rows = [], isLoading } = useMonitoringSummary();
-  const { data: logs = [], isLoading: logsLoading } = useMonitoringLogs({
+  const { data: rows = [], isLoading, isError, error } = useMonitoringSummary();
+  const {
+    data: logs = [],
+    isLoading: logsLoading,
+    isError: isLogsError,
+    error: logsError,
+  } = useMonitoringLogs({
     teamId: selected.teamId || undefined,
     contestId: selected.contestId || undefined,
     limit: 100,
@@ -22,6 +27,7 @@ export default function MonitoringPanel() {
 
   const banTeamMutation = useBanTeam();
   const penalizeMutation = usePenalizeTeam();
+  const clearLogsMutation = useClearAllLogs();
 
   const sortedRows = useMemo(
     () => [...rows].sort((a, b) => {
@@ -70,11 +76,34 @@ export default function MonitoringPanel() {
     }
   };
 
+  const handleClearAllLogs = async () => {
+    if (!window.confirm("Are you sure you want to delete ALL monitoring logs? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      await clearLogsMutation.mutateAsync();
+      toast.success("All logs cleared successfully");
+      setSelected({ teamId: "", contestId: "" });
+    } catch (error) {
+      toast.error(error?.response?.data?.message || "Failed to clear logs");
+    }
+  };
+
   return (
     <div className="space-y-6">
-      <div className="panel mb-0">
-        <h2 className="panel-title">📊 Monitoring Console</h2>
-        <p className="text-sm text-gray-400">Realtime policy events. Auto-refresh interval: 5 seconds.</p>
+      <div className="flex justify-between items-center p-4 bg-cyan-500/10 border border-cyan-500/20 rounded">
+        <div>
+          <h2 className="panel-title text-lg font-bold">📊 Monitoring Console</h2>
+          <p className="text-sm text-gray-400">Realtime policy events. Auto-refresh interval: 5 seconds.</p>
+        </div>
+        <button
+          disabled={clearLogsMutation.isPending}
+          onClick={handleClearAllLogs}
+          className="btn btn-danger text-sm px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {clearLogsMutation.isPending ? "Clearing..." : "🗑️ Clear All Logs"}
+        </button>
       </div>
 
       <div className="panel mb-0 overflow-x-auto">
@@ -93,6 +122,12 @@ export default function MonitoringPanel() {
           <tbody>
             {isLoading ? (
               <tr><td colSpan={7} className="py-6 px-2 text-gray-400">Loading monitoring data...</td></tr>
+            ) : isError ? (
+              <tr>
+                <td colSpan={7} className="py-6 px-2 text-red-300">
+                  Failed to load monitoring summary: {String(error?.message || "Unknown error")}
+                </td>
+              </tr>
             ) : sortedRows.length === 0 ? (
               <tr><td colSpan={7} className="py-6 px-2 text-gray-400">No monitoring records yet.</td></tr>
             ) : (
@@ -192,6 +227,12 @@ export default function MonitoringPanel() {
             <tbody>
               {logsLoading ? (
                 <tr><td colSpan={4} className="py-3 px-2 text-gray-400">Loading logs...</td></tr>
+              ) : isLogsError ? (
+                <tr>
+                  <td colSpan={4} className="py-3 px-2 text-red-300">
+                    Failed to load logs: {String(logsError?.message || "Unknown error")}
+                  </td>
+                </tr>
               ) : logs.length === 0 ? (
                 <tr><td colSpan={4} className="py-3 px-2 text-gray-400">Select a row to view logs.</td></tr>
               ) : (

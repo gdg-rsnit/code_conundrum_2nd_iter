@@ -7,7 +7,6 @@ import { Penalty } from "../models/penaltyModel.js";
 import { TeamRound } from "../models/teamRoundModel.js";
 
 const FLAG_THRESHOLD = 3;
-const AUTO_BAN_THRESHOLD = 5;
 
 type RecordEventInput = {
   teamId: string;
@@ -56,41 +55,76 @@ export const recordMonitoringEvent = async (input: RecordEventInput) => {
     summary.flagged = true;
   }
 
-  if (!summary.autoBanned && summary.fullscreenExitCount > AUTO_BAN_THRESHOLD) {
-    summary.autoBanned = true;
-    summary.autoBannedAt = new Date();
-
-    await Promise.all([
-      Team.findByIdAndUpdate(input.teamId, { banned: true, bannedAt: new Date() }),
-      User.updateMany(
-        { teamId: new mongoose.Types.ObjectId(input.teamId), role: "TEAM" },
-        { banned: true, bannedAt: new Date() }
-      ),
-    ]);
-  }
-
   await summary.save();
 
   return { log, summary };
 };
 
 export const getMonitoringSummary = async () => {
-  const summaries = await MonitoringSummary.find({})
-    .populate("teamId", "teamName banned")
-    .sort({ updatedAt: -1 })
-    .lean();
+  const [teams, groupedLogs, summaryDocs] = await Promise.all([
+    Team.find({}).select("teamName banned updatedAt").lean(),
+    MonitoringLog.aggregate([
+      {
+        $group: {
+          _id: { teamId: "$teamId", contestId: "$contestId" },
+          fullscreenExitCount: {
+            $sum: {
+              $cond: [{ $eq: ["$eventType", "fullscreen_exit"] }, 1, 0],
+            },
+          },
+          tabSwitchCount: {
+            $sum: {
+              $cond: [{ $eq: ["$eventType", "tab_switch"] }, 1, 0],
+            },
+          },
+          updatedAt: { $max: "$timestamp" },
+        },
+      },
+      { $sort: { updatedAt: -1 } },
+    ]),
+    MonitoringSummary.find({}).lean(),
+  ]);
 
-  return summaries.map((item: any) => ({
-    teamId: String(item.teamId?._id || item.teamId),
-    teamName: item.teamId?.teamName || "UNKNOWN TEAM",
-    contestId: item.contestId,
-    fullscreenExitCount: Number(item.fullscreenExitCount || 0),
-    tabSwitchCount: Number(item.tabSwitchCount || 0),
-    flagged: Boolean(item.flagged),
-    autoBanned: Boolean(item.autoBanned),
-    isBanned: Boolean(item.teamId?.banned),
-    updatedAt: item.updatedAt,
-  }));
+  const teamById = new Map(
+    teams.map((team: any) => [String(team._id), team])
+  );
+
+  const summaryByKey = new Map(
+    summaryDocs.map((item: any) => [
+      `${String(item.teamId)}::${String(item.contestId || "")}`,
+      item,
+    ])
+  );
+
+  const summaryRows = groupedLogs.map((item: any) => {
+    const teamId = String(item?._id?.teamId || "");
+    const contestId = String(item?._id?.contestId || "");
+    const team = teamById.get(teamId);
+    const summaryDoc = summaryByKey.get(`${teamId}::${contestId}`);
+
+    return {
+      teamId,
+      teamName: team?.teamName || "UNKNOWN TEAM",
+      contestId,
+      fullscreenExitCount: Number(item.fullscreenExitCount || 0),
+      tabSwitchCount: Number(item.tabSwitchCount || 0),
+      flagged:
+        summaryDoc?.flagged !== undefined
+          ? Boolean(summaryDoc.flagged)
+          : Number(item.fullscreenExitCount || 0) > FLAG_THRESHOLD,
+      autoBanned: Boolean(summaryDoc?.autoBanned),
+      isBanned: Boolean(team?.banned),
+      updatedAt: item.updatedAt || team?.updatedAt || new Date().toISOString(),
+    };
+  });
+
+  const activeRows = summaryRows.filter(
+    (row) => Number(row.fullscreenExitCount || 0) + Number(row.tabSwitchCount || 0) > 0
+  );
+
+  return activeRows.sort(
+    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+  );
 };
 
 export const getMonitoringLogs = async (params: {
@@ -197,5 +231,15 @@ export const penalizeTeam = async (input: {
   return {
     team,
     penalty: penaltyDoc,
+  };
+};
+
+export const clearAllLogs = async () => {
+  const deleteLogsResult = await MonitoringLog.deleteMany({});
+  const deleteSummaryResult = await MonitoringSummary.deleteMany({});
+
+  return {
+    logsDeleted: deleteLogsResult.deletedCount,
+    summariesDeleted: deleteSummaryResult.deletedCount,
   };
 };

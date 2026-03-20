@@ -8,7 +8,7 @@ const FullscreenEnforcer: React.FC<{ children: React.ReactNode }> = ({ children 
   const location = useLocation();
   
   // Define routes where fullscreen is mandatory
-  const mandatoryFullscreenRoutes = ['/waiting-room', '/contest', '/round-complete', '/countdown'];
+  const mandatoryFullscreenRoutes = ['/contest', '/round-complete', '/countdown'];
   const isMandatory = mandatoryFullscreenRoutes.includes(location.pathname);
 
   const teamRaw = localStorage.getItem('cc_team');
@@ -22,6 +22,7 @@ const FullscreenEnforcer: React.FC<{ children: React.ReactNode }> = ({ children 
     teamId: team?.teamId,
     contestId: liveRound?._id,
     enabled: isMandatory && isLoggedIn,
+    trackTabSwitches: location.pathname !== '/contest',
   });
 
   const requestFullscreen = useCallback(() => {
@@ -40,8 +41,13 @@ const FullscreenEnforcer: React.FC<{ children: React.ReactNode }> = ({ children 
       
       if (isFullscreen && !currentlyFullscreen && isMandatory && isLoggedIn) {
         // User exited fullscreen on a mandatory page
-        trackFullscreenExit();
-        toast.warning('You exited fullscreen! This event has been logged.');
+        void trackFullscreenExit().then((logged) => {
+          if (logged) {
+            toast.warning('You exited fullscreen! This event has been logged.');
+          } else {
+            toast.error('Fullscreen exit detected, but monitoring sync failed.');
+          }
+        });
       }
       
       setIsFullscreen(currentlyFullscreen);

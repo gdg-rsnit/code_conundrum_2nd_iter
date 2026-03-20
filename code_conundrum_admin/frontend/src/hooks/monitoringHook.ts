@@ -4,6 +4,7 @@ import {
   getMonitoringLogsRequest,
   getMonitoringSummaryRequest,
   penalizeTeamRequest,
+  clearAllLogsRequest,
 } from "../services/monitoringService.js";
 import type { MonitoringLogsQueryInput, PenalizeTeamInput, BanTeamInput } from "../../../schemas/monitoringSchema.js";
 
@@ -46,6 +47,18 @@ export const usePenalizeTeam = () => {
 
   return useMutation({
     mutationFn: (payload: PenalizeTeamInput) => penalizeTeamRequest(payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["monitoringSummary"] });
+      queryClient.invalidateQueries({ queryKey: ["monitoringLogs"] });
+    },
+  });
+};
+
+export const useClearAllLogs = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => clearAllLogsRequest(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["monitoringSummary"] });
       queryClient.invalidateQueries({ queryKey: ["monitoringLogs"] });

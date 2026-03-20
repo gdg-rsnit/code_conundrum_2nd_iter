@@ -15,10 +15,30 @@ import {
 export const getMonitoringSummaryRequest = async (): Promise<MonitoringSummaryResponse> => {
   const { data } = await api.get("/admin/monitoring");
   const parsed = monitoringSummaryResponseSchema.safeParse(data);
-  if (!parsed.success) {
-    throw parsed.error;
+  if (parsed.success) {
+    return parsed.data;
   }
-  return parsed.data;
+
+  const rows = Array.isArray(data?.data) ? data.data : [];
+  const sanitizedRows = rows
+    .map((item: any) => ({
+      teamId: String(item?.teamId || ""),
+      teamName: String(item?.teamName || "UNKNOWN TEAM"),
+      contestId: String(item?.contestId || ""),
+      fullscreenExitCount: Number(item?.fullscreenExitCount || 0),
+      tabSwitchCount: Number(item?.tabSwitchCount || 0),
+      flagged: Boolean(item?.flagged),
+      autoBanned: Boolean(item?.autoBanned),
+      isBanned: Boolean(item?.isBanned),
+      updatedAt: item?.updatedAt || new Date().toISOString(),
+    }))
+    .filter((item: any) => item.teamId.length > 0);
+
+  return {
+    success: Boolean(data?.success),
+    count: sanitizedRows.length,
+    data: sanitizedRows,
+  };
 };
 
 export const getMonitoringLogsRequest = async (
@@ -57,5 +77,10 @@ export const penalizeTeamRequest = async (payload: PenalizeTeamInput) => {
     throw parsedPayload.error;
   }
   const { data } = await api.post("/admin/penalize-team", parsedPayload.data);
+  return data;
+};
+
+export const clearAllLogsRequest = async () => {
+  const { data } = await api.post("/admin/clear-logs");
   return data;
 };
