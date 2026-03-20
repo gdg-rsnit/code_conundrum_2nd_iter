@@ -27,6 +27,11 @@ const Navbar = () => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      // Exit fullscreen if active
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      
       // Always clear local storage and redirect
       localStorage.removeItem('cc_user');
       localStorage.removeItem('cc_team');

@@ -70,68 +70,21 @@ const Contest = () => {
       document.documentElement.requestFullscreen().catch(err => {
         toast.error(`Error attempting to enable full-screen mode: ${err.message}`);
       });
-    } else if (allowExitFullscreen) {
-      document.exitFullscreen();
     } else {
-      toast.error('You can only exit fullscreen after submission or when the round ends.');
+      // FullscreenEnforcer will handle the overlay if they exit
+      document.exitFullscreen().catch(() => {});
     }
   };
 
-  // Request fullscreen when contest loads
+  // Request fullscreen when contest loads (redundant but kept for immediate trigger if not yet active)
   useEffect(() => {
-    if (!isLoading) {
-      if (document.fullscreenElement) {
-        setIsFullscreen(true);
-        fullscreenWasActiveRef.current = true;
-        return;
-      }
-
-      let retryCount = 0;
-      const maxRetries = 3;
-      
-      const requestFS = () => {
-        document.documentElement.requestFullscreen()
-          .then(() => {
-            console.log('Fullscreen activated successfully');
-            setIsFullscreen(true);
-            fullscreenWasActiveRef.current = true;
-          })
-          .catch(err => {
-            console.warn(`Fullscreen request failed (attempt ${retryCount + 1}):`, err.message);
-            retryCount++;
-            
-            // Retry up to 3 times with increasing delay
-            if (retryCount < maxRetries) {
-              setTimeout(requestFS, 100 * retryCount);
-            } else {
-              toast.error('Could not enable fullscreen. Please click the fullscreen button manually.');
-            }
-          });
-      };
-      
-      // Start fullscreen request with initial delay
-      const timer = setTimeout(requestFS, 200);
-      return () => clearTimeout(timer);
+    if (!isLoading && !document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {});
     }
   }, [isLoading]);
 
-  // Prevent accidental fullscreen exit
+  // Prevent accidental ESC key
   useEffect(() => {
-    const handleFullscreenChange = () => {
-      const wasFullscreen = fullscreenWasActiveRef.current;
-      const isNowFullscreen = !!document.fullscreenElement;
-      setIsFullscreen(isNowFullscreen);
-      fullscreenWasActiveRef.current = isNowFullscreen;
-      
-      // Re-enter fullscreen if user tries to exit before submission
-      if (wasFullscreen && !isNowFullscreen && !allowExitFullscreen) {
-        trackFullscreenExit();
-        setTimeout(() => {
-          document.documentElement.requestFullscreen().catch(() => {});
-        }, 100);
-      }
-    };
-
     const handleKeyDown = (e: KeyboardEvent) => {
       // Block ESC key while contest is active (not submitted yet)
       if (e.key === 'Escape' && !allowExitFullscreen && isFullscreen) {
@@ -140,13 +93,11 @@ const Contest = () => {
       }
     };
     
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
     document.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [allowExitFullscreen, isFullscreen, trackFullscreenExit]);
+  }, [allowExitFullscreen, isFullscreen]);
 
   // Cleanup: exit fullscreen when component unmounts or navigation happens
   useEffect(() => {

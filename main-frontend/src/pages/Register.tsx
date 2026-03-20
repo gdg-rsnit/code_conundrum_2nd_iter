@@ -64,9 +64,15 @@ const Register = () => {
         
         localStorage.setItem('cc_user', JSON.stringify(data.user));
         localStorage.setItem('cc_team', JSON.stringify(userData));
-        
-        navigate('/waiting-room');
-      } else {
+
+        // Request fullscreen on login
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(err => {
+            console.warn('Fullscreen request failed:', err.message);
+          });
+        }
+
+        navigate('/waiting-room');      } else {
         toast.error(data.message || 'Authentication failed');
       }
     } catch (error) {

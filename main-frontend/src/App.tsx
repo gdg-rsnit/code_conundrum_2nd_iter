@@ -16,6 +16,8 @@ import Countdown from "./pages/Countdown";
 import Banned from "./pages/Banned";
 import NotFound from "./pages/NotFound";
 
+import FullscreenEnforcer from "@/components/FullscreenEnforcer";
+
 const queryClient = new QueryClient();
 
 const AppContent = () => {
@@ -32,7 +34,7 @@ const AppContent = () => {
   }
 
   return (
-    <>
+    <FullscreenEnforcer>
       {showNavbar && <Navbar />}
       <Routes>
         <Route path="/" element={<Intro />} />
@@ -47,7 +49,7 @@ const AppContent = () => {
         <Route path="/banned" element={<Banned />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-    </>
+    </FullscreenEnforcer>
   );
 };
 

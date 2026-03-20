@@ -113,10 +113,6 @@ const WaitingRoom = () => {
         hasNavigatedRef.current = true;
         setFlashing(true);
 
-        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-          await document.documentElement.requestFullscreen().catch(() => {});
-        }
-
         const now = Date.now();
         const startAt = new Date(liveRound.startTime).getTime();
         const targetPath = startAt > now ? '/countdown' : '/contest';
