@@ -5,6 +5,7 @@ import PixelRadar from '@/components/PixelRadar';
 import MarqueeStrip from '@/components/MarqueeStrip';
 import { X } from 'lucide-react';
 import { toast } from 'sonner';
+import { handleUnauthorized } from '@/lib/authSession';
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -71,7 +72,7 @@ const WaitingRoom = () => {
           return;
         }
         if (response.status === 401) {
-          navigate('/home');
+          handleUnauthorized(navigate, '/home');
           return;
         }
         if (!response.ok) return;

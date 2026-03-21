@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import StarfieldBackground from '@/components/StarfieldBackground';
 import PixelButton from '@/components/PixelButton';
+import { clearAuthSession } from '@/lib/authSession';
 
 const Banned = () => {
   const navigate = useNavigate();
@@ -15,10 +16,7 @@ const Banned = () => {
       // Ignore logout API errors and clear local state anyway.
     }
 
-    localStorage.removeItem('cc_user');
-    localStorage.removeItem('cc_team');
-    localStorage.removeItem('cc_live_round');
-    localStorage.removeItem('cc_result');
+    clearAuthSession();
     navigate('/home');
   };
 

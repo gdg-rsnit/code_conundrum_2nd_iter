@@ -4,7 +4,8 @@ import PixelCard from '@/components/PixelCard';
 import PixelBadge from '@/components/PixelBadge';
 import { CrownIcon, MedalIcon } from '@/components/PixelIcons';
 import { cn } from '@/lib/utils';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { handleUnauthorized } from '@/lib/authSession';
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -30,6 +31,7 @@ const podiumConfig = {
 };
 
 const Leaderboard = () => {
+  const navigate = useNavigate();
   const [activeRound, setActiveRound] = useState(0);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [roundsData, setRoundsData] = useState<Record<number, LeaderboardRow[]>>({});
@@ -40,6 +42,10 @@ const Leaderboard = () => {
       const response = await fetch(`${API_URL}/submissions`, {
         credentials: 'include',
       });
+      if (response.status === 401) {
+        handleUnauthorized(navigate, '/home');
+        return;
+      }
       const data = await response.json();
       const submissions = Array.isArray(data?.data) ? data.data : [];
 
@@ -86,7 +92,7 @@ const Leaderboard = () => {
       setRoundsData({});
       setRoundLabels([]);
     }
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     fetchLeaderboard();

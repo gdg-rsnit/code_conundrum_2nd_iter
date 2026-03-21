@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import GdgLogo from './GdgLogo';
 import { LogOut } from 'lucide-react';
 import { toast } from 'sonner';
+import { clearAuthSession } from '@/lib/authSession';
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -32,10 +33,8 @@ const Navbar = () => {
         document.exitFullscreen().catch(() => {});
       }
       
-      // Always clear local storage and redirect
-      localStorage.removeItem('cc_user');
-      localStorage.removeItem('cc_team');
-      localStorage.removeItem('cc_result');
+      // Always clear local auth state and redirect
+      clearAuthSession();
       toast.success('Logged out successfully');
       navigate('/home'); // Redirect to home as requested
     }

@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Maximize2, Loader2, Minimize2 } from 'lucide-react';
 import { toast } from 'sonner';
 import useMonitoring from '@/hooks/useMonitoring';
+import { handleUnauthorized } from '@/lib/authSession';
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -127,7 +128,7 @@ const Contest = () => {
           return;
         }
         if (roundRes.status === 401) {
-          navigate('/home');
+          handleUnauthorized(navigate, '/home');
           return;
         }
         const roundData = await roundRes.json();
@@ -169,7 +170,7 @@ const Contest = () => {
             return;
           }
           if (submissionRes.status === 401) {
-            navigate('/home');
+            handleUnauthorized(navigate, '/home');
             return;
           }
           const submissionData = await submissionRes.json().catch(() => ({}));
@@ -203,7 +204,7 @@ const Contest = () => {
           return;
         }
         if (qRes.status === 401) {
-          navigate('/home');
+          handleUnauthorized(navigate, '/home');
           return;
         }
         const qData = await qRes.json();
@@ -217,7 +218,7 @@ const Contest = () => {
           return;
         }
         if (aRes.status === 401) {
-          navigate('/home');
+          handleUnauthorized(navigate, '/home');
           return;
         }
         const aData = await aRes.json();
@@ -263,7 +264,7 @@ const Contest = () => {
           return;
         }
         if (roundRes.status === 401) {
-          navigate('/home');
+          handleUnauthorized(navigate, '/home');
           return;
         }
         const roundData = await roundRes.json();
@@ -435,7 +436,7 @@ const Contest = () => {
         return;
       }
       if (response.status === 401) {
-        navigate('/home');
+        handleUnauthorized(navigate, '/home');
         return;
       }
 
