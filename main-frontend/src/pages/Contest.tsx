@@ -152,12 +152,6 @@ const Contest = () => {
         setLiveRoundId(liveRound._id);
         setLiveRoundNumber(Number(liveRound.roundNumber || 0));
 
-        const alreadySubmitted = localStorage.getItem(`cc_submitted_${team?.teamId}_${liveRound._id}`) === 'true';
-        if (alreadySubmitted) {
-          navigate('/round-complete');
-          return;
-        }
-
         if (team?.teamId) {
           const submissionRes = await fetch(
             `${API_URL}/submissions?teamId=${team.teamId}&roundId=${liveRound._id}`,
@@ -176,17 +170,43 @@ const Contest = () => {
           const submissionData = await submissionRes.json().catch(() => ({}));
           if (submissionRes.ok && Array.isArray(submissionData?.data) && submissionData.data.length > 0) {
             const existing = submissionData.data[0];
+            const rawSolvedCount = Number(existing?.questionsSolved || 0);
+            const rawTotalQuestions = Number(existing?.totalQuestions || 0);
+            const solvedCount =
+              rawSolvedCount > 0 && rawSolvedCount % 10 === 0
+                ? Math.floor(rawSolvedCount / 10)
+                : rawSolvedCount;
+            const normalizedTotalQuestions =
+              rawTotalQuestions > 0 && rawTotalQuestions % 10 === 0
+                ? Math.floor(rawTotalQuestions / 10)
+                : rawTotalQuestions;
+            const accuracyPct = Number(existing?.accuracy || 0);
+            const inferredTotalFromAccuracy =
+              accuracyPct > 0
+                ? Math.round((solvedCount * 100) / accuracyPct)
+                : 0;
+            const totalQuestions = Math.max(
+              normalizedTotalQuestions,
+              questions.length,
+              inferredTotalFromAccuracy,
+              solvedCount
+            );
+
             localStorage.setItem(`cc_submitted_${team.teamId}_${liveRound._id}`, 'true');
             localStorage.setItem('cc_result', JSON.stringify({
-              score: Number(existing?.questionsSolved || 0),
-              total: Number(existing?.totalQuestions || questions.length || 0),
+              score: solvedCount,
+              total: totalQuestions,
               timeTaken: Number(existing?.timeSeconds || 0),
-              accuracy: Number(existing?.accuracy || 0),
-              matchedCount: Number(existing?.questionsSolved || 0)
+              accuracy: accuracyPct,
+              matchedCount: solvedCount
             }));
             navigate('/round-complete');
             return;
           }
+
+          // Backend is source of truth: clear stale local submitted/result state for this round.
+          localStorage.removeItem(`cc_submitted_${team.teamId}_${liveRound._id}`);
+          localStorage.removeItem('cc_result');
         }
 
         localStorage.setItem('cc_live_round', JSON.stringify({
@@ -464,6 +484,10 @@ const Contest = () => {
     }
 
     // Allow fullscreen exit and exit fullscreen
+    sessionStorage.setItem(
+      'cc_skip_fullscreen_enforcer_until',
+      String(Date.now() + 3000)
+    );
     setAllowExitFullscreen(true);
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});

@@ -4,10 +4,28 @@ import { TrophyIcon } from '@/components/PixelIcons';
 
 const RoundComplete = () => {
   const stored = localStorage.getItem('cc_result');
-  const result = stored ? JSON.parse(stored) : { score: 0, total: 8, timeTaken: 0 };
-  const accuracy = result.total > 0 ? Math.round((result.score / result.total) * 100) : 0;
-  const mins = Math.floor(result.timeTaken / 60);
-  const secs = result.timeTaken % 60;
+  const parsed = stored ? JSON.parse(stored) : {};
+  let score = Math.max(0, Number(parsed?.score ?? parsed?.matchedCount ?? 0));
+  let savedTotal = Math.max(0, Number(parsed?.total ?? 0));
+  const savedAccuracy = Math.max(0, Number(parsed?.accuracy ?? 0));
+
+  // Backward compatibility: older payloads may store score/total in points (x10).
+  if (score > 0 && savedTotal > 0 && score % 10 === 0 && savedTotal % 10 === 0) {
+    score = Math.floor(score / 10);
+    savedTotal = Math.floor(savedTotal / 10);
+  }
+
+  const inferredTotalFromAccuracy = savedAccuracy > 0
+    ? Math.round((score * 100) / savedAccuracy)
+    : 0;
+  const total = savedTotal > 0
+    ? Math.max(savedTotal, score)
+    : Math.max(inferredTotalFromAccuracy, score);
+
+  const accuracy = total > 0 ? Math.round((score / total) * 100) : savedAccuracy;
+  const timeTaken = Math.max(0, Number(parsed?.timeTaken ?? 0));
+  const mins = Math.floor(timeTaken / 60);
+  const secs = timeTaken % 60;
 
   const accColor = accuracy > 75 ? '#00F5FF' : accuracy >= 50 ? '#EAB308' : '#EF4444';
 
@@ -29,7 +47,7 @@ const RoundComplete = () => {
           </div>
 
           <div className="font-pixel text-xl md:text-3xl text-foreground mb-4">
-            {result.score} / {result.total} CORRECT
+            {score} / {total} CORRECT
           </div>
 
           <div className="font-mono-tech text-sm text-muted-foreground mb-4">

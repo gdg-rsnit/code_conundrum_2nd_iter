@@ -42,6 +42,11 @@ const rounds = [
 ];
 
 const Index = () => {
+  const hasRegistration = Boolean(
+    localStorage.getItem('cc_user') || localStorage.getItem('cc_team')
+  );
+  const joinContestPath = hasRegistration ? '/waiting-room' : '/register';
+
   return (
     <div className="relative min-h-screen scanline-overlay">
       <StarfieldBackground showClouds showPlanets />
@@ -94,7 +99,7 @@ const Index = () => {
 
         {/* CTAs */}
         <div className="flex flex-col sm:flex-row gap-4 items-center">
-          <Link to="/register">
+          <Link to={joinContestPath}>
             <PixelButton variant="primary" pixelSize="lg">
               JOIN CONTEST
             </PixelButton>

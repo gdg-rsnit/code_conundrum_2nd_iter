@@ -8,8 +8,9 @@ const FullscreenEnforcer: React.FC<{ children: React.ReactNode }> = ({ children 
   const location = useLocation();
   
   // Define routes where fullscreen is mandatory
-  const mandatoryFullscreenRoutes = ['/contest', '/round-complete', '/countdown'];
+  const mandatoryFullscreenRoutes = ['/contest', '/countdown'];
   const isMandatory = mandatoryFullscreenRoutes.includes(location.pathname);
+  const shouldLogFullscreenExit = location.pathname === '/contest';
 
   const teamRaw = localStorage.getItem('cc_team');
   const team = teamRaw ? JSON.parse(teamRaw) : null;
@@ -21,9 +22,12 @@ const FullscreenEnforcer: React.FC<{ children: React.ReactNode }> = ({ children 
   const { trackFullscreenExit } = useMonitoring({
     teamId: team?.teamId,
     contestId: liveRound?._id,
-    enabled: isMandatory && isLoggedIn,
-    trackTabSwitches: location.pathname !== '/contest',
+    enabled: shouldLogFullscreenExit && isLoggedIn,
+    trackTabSwitches: false,
   });
+
+  const skipUntil = Number(sessionStorage.getItem('cc_skip_fullscreen_enforcer_until') || 0);
+  const isSuppressed = Date.now() < skipUntil;
 
   const requestFullscreen = useCallback(() => {
     const element = document.documentElement;
@@ -39,8 +43,14 @@ const FullscreenEnforcer: React.FC<{ children: React.ReactNode }> = ({ children 
     const handleFullscreenChange = () => {
       const currentlyFullscreen = !!document.fullscreenElement;
       
-      if (isFullscreen && !currentlyFullscreen && isMandatory && isLoggedIn) {
-        // User exited fullscreen on a mandatory page
+      if (isFullscreen && !currentlyFullscreen && shouldLogFullscreenExit && isLoggedIn) {
+        const suppressUntil = Number(sessionStorage.getItem('cc_skip_fullscreen_enforcer_until') || 0);
+        if (Date.now() < suppressUntil) {
+          setIsFullscreen(currentlyFullscreen);
+          return;
+        }
+
+        // Only contest page fullscreen exits should be logged.
         void trackFullscreenExit().then((logged) => {
           if (logged) {
             toast.warning('You exited fullscreen! This event has been logged.');
@@ -57,10 +67,10 @@ const FullscreenEnforcer: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       document.removeEventListener('fullscreenchange', handleFullscreenChange);
     };
-  }, [isFullscreen, isMandatory, isLoggedIn, trackFullscreenExit]);
+  }, [isFullscreen, shouldLogFullscreenExit, isLoggedIn, trackFullscreenExit]);
 
   // If mandatory but not fullscreen, show overlay
-  const showOverlay = isMandatory && isLoggedIn && !isFullscreen;
+  const showOverlay = isMandatory && isLoggedIn && !isFullscreen && !isSuppressed;
 
   return (
     <>
