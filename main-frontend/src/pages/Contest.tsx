@@ -333,7 +333,6 @@ const Contest = () => {
 
   useEffect(() => {
     if (timeLeft === 0 && !locked && !isLoading) {
-      setAllowExitFullscreen(true);
       handleSubmit('auto-timeout');
     }
   }, [timeLeft, locked, isLoading]);
@@ -481,16 +480,6 @@ const Contest = () => {
     } catch (error: any) {
       console.error('Submission error:', error);
       toast.error(error?.message || 'Submission failed.');
-    }
-
-    // Allow fullscreen exit and exit fullscreen
-    sessionStorage.setItem(
-      'cc_skip_fullscreen_enforcer_until',
-      String(Date.now() + 3000)
-    );
-    setAllowExitFullscreen(true);
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
     }
 
     setTimeout(() => {

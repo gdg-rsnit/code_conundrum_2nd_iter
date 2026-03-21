@@ -7,10 +7,16 @@ const FullscreenEnforcer: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isFullscreen, setIsFullscreen] = useState(!!document.fullscreenElement);
   const location = useLocation();
   
-  // Define routes where fullscreen is mandatory
-  const mandatoryFullscreenRoutes = ['/contest', '/countdown'];
+  // Enforce fullscreen after login on all competition flow pages.
+  const mandatoryFullscreenRoutes = [
+    '/waiting-room',
+    '/contest',
+    '/countdown',
+    '/round-complete',
+    '/leaderboard',
+  ];
   const isMandatory = mandatoryFullscreenRoutes.includes(location.pathname);
-  const shouldLogFullscreenExit = location.pathname === '/contest';
+  const shouldLogFullscreenExit = isMandatory;
 
   const teamRaw = localStorage.getItem('cc_team');
   const team = teamRaw ? JSON.parse(teamRaw) : null;
@@ -38,6 +44,12 @@ const FullscreenEnforcer: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     }
   }, []);
+
+  useEffect(() => {
+    if (isMandatory && isLoggedIn && !document.fullscreenElement) {
+      requestFullscreen();
+    }
+  }, [isMandatory, isLoggedIn, requestFullscreen]);
 
   useEffect(() => {
     const handleFullscreenChange = () => {
