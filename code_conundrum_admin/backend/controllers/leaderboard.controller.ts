@@ -68,17 +68,17 @@ export const fetchLeaderboard = async (req: Request<{ round: string }>, res: Res
 
   try {
     // Step 1 — check Redis
-    let leaderboard: LeaderboardEntry[] = await getLeaderboard(round, limit)
+    let leaderboard: LeaderboardEntry[] = await getLeaderboard(Number(round), limit)
 
     if (leaderboard.length === 0) {
       // Step 2 — If the fast list is empty, get data from the permanent database
       console.log(`Cache miss for round ${round} — fetching from MongoDB`)
 
-      const participants = await getParticipantsByRound(round, limit)
+      const participants = await getParticipantsByRound(Number(round), limit)
 
       // Step 3 — repopulate Redis from MongoDB data
       for (const p of participants) {
-        await addToLeaderboard(round, p.username, p.score, p.timeSeconds, p.accuracy)
+        await addToLeaderboard(Number(round), p.username, p.score, p.timeSeconds, p.accuracy)
       }
 
       // Step 4 — format response
@@ -108,7 +108,7 @@ export const clearCache = async (req: Request, res: Response): Promise<void> => 
   }
 
   try {
-    await invalidateCache(result.data.round)
+    await invalidateCache(Number(result.data.round))
 
     res.status(200).json({ message: 'Cache cleared' })
 
