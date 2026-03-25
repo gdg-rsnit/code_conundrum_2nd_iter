@@ -4,6 +4,7 @@ const tabs = [
   { to: "/rounds", label: "ROUNDS", icon: "🔄" },
   { to: "/questions", label: "QUESTIONS", icon: "📝" },
   { to: "/teams", label: "TEAMS", icon: "👥" },
+  { to: "/waiting-room", label: "WAITING ROOM", icon: "🛰️" },
   { to: "/users", label: "USERS", icon: "👤" },
   { to: "/leaderboard", label: "LEADERBOARD", icon: "🏆" },
   { to: "/monitoring", label: "MONITORING", icon: "📊" },

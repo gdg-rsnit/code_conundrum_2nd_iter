@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import createToken from "../utils/createToken.js";
 import type { Request, Response } from "express";
 import { loginUserSchema } from "../../schemas/userSchema.js";
+import { WaitingPresence } from "../models/waitingPresenceModel.js";
 
 interface AuthenticatedRequest extends Request {
   user?: IUser;
@@ -71,6 +72,12 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
 });
 
 const logoutUser = asyncHandler(async (req: Request, res: Response) => {
+  const authReq = req as AuthenticatedRequest;
+
+  if (authReq.user?.role === "TEAM" && authReq.user.teamId) {
+    await WaitingPresence.deleteOne({ teamId: authReq.user.teamId });
+  }
+
   res.cookie("jwt", "", {
     httpOnly: true,
     expires: new Date(0),

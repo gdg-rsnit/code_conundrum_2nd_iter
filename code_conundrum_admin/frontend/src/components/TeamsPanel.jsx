@@ -1,36 +1,55 @@
 import { useState } from "react";
 import toast from "react-hot-toast";
-import { useGetAllTeams, useGetPenalizedTeams, useUpdateTeamStatus, usePenalizeTeams, useDeletePenalty } from "../hooks/teamHook";
+import {
+  useGetAllTeams,
+  useGetPenalizedTeams,
+  useUpdateTeamStatus,
+  usePenalizeTeams,
+  useDeletePenalty,
+  useCreateTeam,
+  useGetWaitingRoomSnapshot,
+} from "../hooks/teamHook";
 import { useGetRounds } from "../hooks/roundHook";
 import Loading from "./Loading";
 
 export default function TeamsPanel() {
   const [filterStatus, setFilterStatus] = useState("ALL");
   const [penaltyModal, setPenaltyModal] = useState(null);
+  const [createTeamModalOpen, setCreateTeamModalOpen] = useState(false);
   const [penaltyForm, setPenaltyForm] = useState({
     roundId: "",
     reason: "",
     scoreDeducted: 0,
     timeDeducted: 0,
   });
+  const [createTeamForm, setCreateTeamForm] = useState({
+    teamName: "",
+    memberOne: "",
+    memberTwo: "",
+    password: "",
+  });
   
   // Fetch teams and penalties data
   const { data: teams = [], isLoading: teamsLoading, error: teamsError } = useGetAllTeams();
   const { data: penalties = [], isLoading: penaltiesLoading } = useGetPenalizedTeams();
+  const { data: waitingSnapshot = { waitingCount: 0, teams: [] } } = useGetWaitingRoomSnapshot();
   const { data: rounds = [] } = useGetRounds();
   const updateTeamStatusMutation = useUpdateTeamStatus();
   const penalizeTeamMutation = usePenalizeTeams();
   const deletePenaltyMutation = useDeletePenalty();
+  const createTeamMutation = useCreateTeam();
 
   // Calculate stats from real data
   const activeTeamsCount = teams.filter(t => !t.banned).length;
   const bannedTeamsCount = teams.filter(t => t.banned).length;
   const penalizedTeamsCount = penalties.length;
+  const waitingTeamsCount = waitingSnapshot.waitingCount;
 
   const stats = [
     { label: "ACTIVE TEAMS", value: activeTeamsCount, color: "green", icon: "👥" },
     { label: "PENALIZED", value: penalizedTeamsCount, color: "orange", icon: "⚠️" },
-    { label: "BANNED", value: bannedTeamsCount, color: "red", icon: "🚫" }
+    { label: "BANNED", value: bannedTeamsCount, color: "red", icon: "🚫" },
+    { label: "WAITING NOW", value: waitingTeamsCount, color: "cyan", icon: "🛰️" }
   ];
 
   // Filter teams based on status
@@ -137,6 +156,42 @@ export default function TeamsPanel() {
     }
   };
 
+  const closeCreateTeamModal = () => {
+    setCreateTeamModalOpen(false);
+    setCreateTeamForm({
+      teamName: "",
+      memberOne: "",
+      memberTwo: "",
+      password: "",
+    });
+  };
+
+  const handleCreateTeam = async (e) => {
+    e.preventDefault();
+
+    const payload = {
+      teamName: createTeamForm.teamName.trim(),
+      memberOne: createTeamForm.memberOne.trim(),
+      memberTwo: createTeamForm.memberTwo.trim(),
+      password: createTeamForm.password,
+    };
+
+    if (!payload.teamName || !payload.memberOne || !payload.memberTwo || !payload.password) {
+      toast.error("All fields are required");
+      return;
+    }
+
+    const loadingToast = toast.loading("Creating team...");
+    try {
+      await createTeamMutation.mutateAsync(payload);
+      toast.success("Team created successfully", { id: loadingToast });
+      closeCreateTeamModal();
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || "Failed to create team";
+      toast.error(message, { id: loadingToast });
+    }
+  };
+
   if (teamsLoading || penaltiesLoading) return <Loading />;
   
   if (teamsError) {
@@ -153,12 +208,13 @@ export default function TeamsPanel() {
         <h1 className="terminal-title">👥 TEAMS MANAGEMENT</h1>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           {stats.map((stat) => {
             const gradientClass = {
               green: "from-green-400/10 to-green-400/5 border-green-400/50 shadow-green-400/20",
               orange: "from-orange-400/10 to-orange-400/5 border-orange-400/50 shadow-orange-400/20",
-              red: "from-red-400/10 to-red-400/5 border-red-400/50 shadow-red-400/20"
+              red: "from-red-400/10 to-red-400/5 border-red-400/50 shadow-red-400/20",
+              cyan: "from-cyan-400/10 to-cyan-400/5 border-cyan-400/50 shadow-cyan-400/20"
             }[stat.color];
 
             return (
@@ -178,11 +234,31 @@ export default function TeamsPanel() {
           })}
         </div>
 
+        <div className="panel border-cyan-400/40 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="panel-title m-0">🛰️ Waiting Room Live</h2>
+            <span className="text-xs text-cyan-200">{waitingSnapshot.waitingCount} teams online</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {waitingSnapshot.teams.map((team) => (
+              <div key={team.teamId} className="rounded border border-cyan-400/30 bg-cyan-400/5 p-3">
+                <p className="font-bold text-cyan-200">{team.teamName}</p>
+                <p className="text-xs text-gray-400">{team.members.join(", ") || "No members"}</p>
+              </div>
+            ))}
+          </div>
+
+          {waitingSnapshot.teams.length === 0 && (
+            <p className="text-sm text-gray-400">No teams are currently in the waiting room.</p>
+          )}
+        </div>
+
         {/* Teams Management */}
         <div className="panel">
           <div className="flex justify-between items-center mb-6">
             <h2 className="panel-title m-0">🔧 Manage Teams</h2>
-            <button className="btn btn-cyan">+ ADD TEAM</button>
+            <button className="btn btn-cyan" onClick={() => setCreateTeamModalOpen(true)}>+ ADD TEAM</button>
           </div>
 
           {/* Filter Buttons */}
@@ -387,6 +463,75 @@ export default function TeamsPanel() {
                   className="flex-1 btn btn-danger"
                   onClick={closePenaltyModal}
                   disabled={penalizeTeamMutation.isPending}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {createTeamModalOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="panel max-w-md w-full border-cyan-400/50">
+            <h3 className="text-xl font-bold text-cyan-300 mb-4">Create Team</h3>
+
+            <form onSubmit={handleCreateTeam} className="space-y-4">
+              <div>
+                <label className="block text-xs text-cyan-300 mb-2">Team Name *</label>
+                <input
+                  className="input"
+                  value={createTeamForm.teamName}
+                  onChange={(e) => setCreateTeamForm({ ...createTeamForm, teamName: e.target.value })}
+                  placeholder="Enter team name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-cyan-300 mb-2">Member 1 *</label>
+                <input
+                  className="input"
+                  value={createTeamForm.memberOne}
+                  onChange={(e) => setCreateTeamForm({ ...createTeamForm, memberOne: e.target.value })}
+                  placeholder="First member name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-cyan-300 mb-2">Member 2 *</label>
+                <input
+                  className="input"
+                  value={createTeamForm.memberTwo}
+                  onChange={(e) => setCreateTeamForm({ ...createTeamForm, memberTwo: e.target.value })}
+                  placeholder="Second member name"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-cyan-300 mb-2">Password *</label>
+                <input
+                  className="input"
+                  type="password"
+                  value={createTeamForm.password}
+                  onChange={(e) => setCreateTeamForm({ ...createTeamForm, password: e.target.value })}
+                  placeholder="Team login password"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  className="flex-1 btn btn-cyan"
+                  disabled={createTeamMutation.isPending}
+                >
+                  {createTeamMutation.isPending ? "Creating..." : "Create Team"}
+                </button>
+                <button
+                  type="button"
+                  className="flex-1 btn btn-danger"
+                  onClick={closeCreateTeamModal}
+                  disabled={createTeamMutation.isPending}
                 >
                   Cancel
                 </button>

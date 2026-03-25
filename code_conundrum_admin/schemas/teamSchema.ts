@@ -11,6 +11,41 @@ export const createTeamSchema = z.object({
     .min(2, "Team must have 2 members"),
 });
 
+export const adminCreateTeamSchema = z.object({
+  teamName: z
+    .string()
+    .min(3, "Team name must be at least 3 characters")
+    .max(20, "Team name must be at most 20 characters")
+    .trim(),
+  memberOne: z
+    .string()
+    .min(1, "Member one name is required")
+    .max(50, "Member one name must be at most 50 characters")
+    .trim(),
+  memberTwo: z
+    .string()
+    .min(1, "Member two name is required")
+    .max(50, "Member two name must be at most 50 characters")
+    .trim(),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+export const waitingRoomEntrySchema = z.object({
+  teamId: z.string(),
+  teamName: z.string(),
+  members: z.array(z.string()),
+  lastSeenAt: z.string(),
+});
+
+export const waitingRoomSnapshotSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  data: z.object({
+    waitingCount: z.number(),
+    teams: z.array(waitingRoomEntrySchema),
+  }),
+});
+
 export const updateTeamSchema = z.object({
   teamName: z
     .string()
@@ -56,8 +91,10 @@ export const teamItemResponseSchema = z.object({
 });
 
 export type CreateTeamInput = z.infer<typeof createTeamSchema>;
+export type AdminCreateTeamInput = z.infer<typeof adminCreateTeamSchema>;
 export type UpdateTeamInput = z.infer<typeof updateTeamSchema>;
 export type UpdateTeamStatusInput = z.infer<typeof updateTeamStatusSchema>;
 export type TeamResponse = z.infer<typeof teamResponseSchema>;
 export type GetTeamsResponse = z.infer<typeof getTeamsResponseSchema>;
 export type TeamItemResponse = z.infer<typeof teamItemResponseSchema>;
+export type WaitingRoomSnapshotResponse = z.infer<typeof waitingRoomSnapshotSchema>;

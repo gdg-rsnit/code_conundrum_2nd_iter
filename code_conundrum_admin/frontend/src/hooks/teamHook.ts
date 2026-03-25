@@ -1,13 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+    createTeamRequest,
     deletePenaltyRequest,
     getAllTeamsRequest,
     getBannedTeamsRequest,
     getPenalizedTeamsRequest,
+    getWaitingRoomSnapshotRequest,
     penalizeTeamsRequest,
     updateTeamStatusRequest,
 } from "../services/teamService.js";
 import type { CreatePenaltyInput } from "../../../schemas/penaltySchema.js";
+import type { AdminCreateTeamInput } from "../../../schemas/teamSchema.js";
 
 type UpdateTeamStatusVariables = {
     teamId: string;
@@ -98,5 +101,28 @@ export const useDeletePenalty = () => {
             queryClient.invalidateQueries({ queryKey: ["getBannedTeams"] });
         },
         onError: (error: any) => console.error(error),
+    });
+};
+
+export const useCreateTeam = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: (payload: AdminCreateTeamInput) => createTeamRequest(payload),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["getAllTeams"] });
+            queryClient.invalidateQueries({ queryKey: ["getWaitingRoomSnapshot"] });
+        },
+        onError: (error: any) => console.error(error),
+    });
+};
+
+export const useGetWaitingRoomSnapshot = () => {
+    return useQuery({
+        queryKey: ["getWaitingRoomSnapshot"],
+        queryFn: getWaitingRoomSnapshotRequest,
+        refetchInterval: 2000,
+        retry: 1,
+        select: (data) => data.data,
     });
 };

@@ -13,7 +13,7 @@ const router = express.Router();
 
 //userroutes
 router.post("/auth",loginUser);
-router.post("/logout",logoutUser);
+router.post("/logout",authenticate,logoutUser);
 
 //admin routes
 router.route("/").get(authenticate,authorizeAdmin,getAllUsers);

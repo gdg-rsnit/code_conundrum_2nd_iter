@@ -1,11 +1,15 @@
 import api from "../lib/axios.js";
 
 import {
+    adminCreateTeamSchema,
     getTeamsResponseSchema,
     teamItemResponseSchema,
+    waitingRoomSnapshotSchema,
     updateTeamStatusSchema,
+    type AdminCreateTeamInput,
     type GetTeamsResponse,
     type TeamItemResponse,
+    type WaitingRoomSnapshotResponse,
     type UpdateTeamStatusInput,
 } from "../../../schemas/teamSchema.js";
 import {
@@ -88,5 +92,50 @@ export const deletePenaltyRequest = async (
     if (!validation.success) {
         throw validation.error;
     }
+    return validation.data;
+};
+
+export const createTeamRequest = async (payload: AdminCreateTeamInput): Promise<TeamItemResponse> => {
+    const inputValidation = adminCreateTeamSchema.safeParse(payload);
+    if (!inputValidation.success) {
+        throw inputValidation.error;
+    }
+
+    const { data } = await api.post("/admin/teams", inputValidation.data);
+    const validation = teamItemResponseSchema.safeParse({
+        ...data,
+        data: data?.data?.team ?? data?.data,
+    });
+
+    if (!validation.success) {
+        throw validation.error;
+    }
+
+    return validation.data;
+};
+
+export const getWaitingRoomSnapshotRequest = async (): Promise<WaitingRoomSnapshotResponse> => {
+    const { data } = await api.get("/admin/teams/waiting-room");
+    const validation = waitingRoomSnapshotSchema.safeParse(data);
+    if (!validation.success) {
+        throw validation.error;
+    }
+    return validation.data;
+};
+
+export const getWaitingRoomCountRequest = async (): Promise<WaitingRoomSnapshotResponse> => {
+    const { data } = await api.get("/admin/teams/waiting-room/count");
+    const validation = waitingRoomSnapshotSchema.safeParse({
+        ...data,
+        data: {
+            waitingCount: data?.data?.waitingCount ?? 0,
+            teams: [],
+        },
+    });
+
+    if (!validation.success) {
+        throw validation.error;
+    }
+
     return validation.data;
 };

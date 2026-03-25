@@ -6,6 +6,7 @@ import Footer from "./components/Footer";
 import RoundPanel from "./components/RoundPanel";
 import QuestionsPanel from "./components/QuestionsPanel";
 import TeamsPanel from "./components/TeamsPanel";
+import WaitingRoomPanel from "./components/WaitingRoomPanel";
 import UsersPanel from "./components/UsersPanel";
 import LeaderboardPanel from "./components/LeaderboardPanel";
 import MonitoringPanel from "./components/MonitoringPanel";
@@ -37,6 +38,7 @@ function AdminLayout() {
     "/rounds": { icon: "🔄", title: "Round Management" },
     "/questions": { icon: "📝", title: "Questions & Answers" },
     "/teams": { icon: "👥", title: "Team Management" },
+    "/waiting-room": { icon: "🛰️", title: "Waiting Room Monitor" },
     "/users": { icon: "👤", title: "User Management" },
     "/leaderboard": { icon: "🏆", title: "Leaderboard" },
     "/monitoring": { icon: "📊", title: "Monitoring" },
@@ -103,6 +105,7 @@ export default function App() {
             <Route path="/rounds" element={<RoundPanel />} />
             <Route path="/questions" element={<QuestionsPanel />} />
             <Route path="/teams" element={<TeamsPanel />} />
+            <Route path="/waiting-room" element={<WaitingRoomPanel />} />
             <Route path="/users" element={<UsersPanel />} />
             <Route path="/leaderboard" element={<LeaderboardPanel />} />
             <Route path="/monitoring" element={<MonitoringPanel />} />

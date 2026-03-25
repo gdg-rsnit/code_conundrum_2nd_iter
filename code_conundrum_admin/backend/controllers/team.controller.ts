@@ -6,6 +6,35 @@ import { Penalty, type IPenalty } from "../models/penaltyModel.js";
 import { createPenaltySchema, updatePenaltySchema } from "../../schemas/penaltySchema.js";
 import { ZodError } from "zod";
 import { TeamRound } from "../models/teamRoundModel.js";
+import bcrypt from "bcryptjs";
+import { adminCreateTeamSchema } from "../../schemas/teamSchema.js";
+import { WaitingPresence } from "../models/waitingPresenceModel.js";
+
+const WAITING_ROOM_TTL_MS = 30 * 1000;
+
+interface AuthenticatedRequest extends Request {
+    user?: {
+        role: "ADMIN" | "TEAM";
+        teamId: string | null;
+        _id: string;
+    };
+}
+
+const getActiveWaitingTeams = async () => {
+    const threshold = new Date(Date.now() - WAITING_ROOM_TTL_MS);
+    await WaitingPresence.deleteMany({ lastSeenAt: { $lt: threshold } });
+
+    const teams = await WaitingPresence.find({})
+        .sort({ lastSeenAt: -1 })
+        .lean();
+
+    return teams.map((item: { teamId: unknown; teamName: string; members: string[]; lastSeenAt: Date }) => ({
+        teamId: String(item.teamId),
+        teamName: item.teamName,
+        members: item.members,
+        lastSeenAt: item.lastSeenAt.toISOString(),
+    }));
+};
 
 
 //ban/unban
@@ -65,6 +94,117 @@ const getTeams = asyncHandler(async (req: Request, res: Response) => {
         data: teams,
         success: true,
         message: "Teams retrieved successfully",
+    });
+});
+
+const createTeamByAdmin = asyncHandler(async (req: Request, res: Response) => {
+    const parsed = adminCreateTeamSchema.safeParse(req.body);
+    if (!parsed.success) {
+        return res.status(400).json({ success: false, errors: parsed.error.issues });
+    }
+
+    const { teamName, memberOne, memberTwo, password } = parsed.data;
+
+    if (memberOne.toLowerCase() === memberTwo.toLowerCase()) {
+        return res.status(400).json({ success: false, message: "Members must be different" });
+    }
+
+    const existingTeam = await Team.findOne({ teamName: { $regex: new RegExp(`^${teamName}$`, "i") } }).lean();
+    if (existingTeam) {
+        return res.status(409).json({ success: false, message: "Team name already exists" });
+    }
+
+    const baseSlug = teamName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "") || "team";
+
+    let generatedEmail = `${baseSlug}@contest.local`;
+    let suffix = 1;
+
+    while (await User.findOne({ email: generatedEmail }).lean()) {
+        generatedEmail = `${baseSlug}-${suffix}@contest.local`;
+        suffix += 1;
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const team = await Team.create({
+        teamName,
+        teamMembers: [memberOne, memberTwo],
+    });
+
+    await User.create({
+        email: generatedEmail,
+        password: hashedPassword,
+        role: "TEAM",
+        teamId: team._id,
+    });
+
+    res.status(201).json({
+        success: true,
+        message: "Team created successfully",
+        data: {
+            team,
+            login: {
+                email: generatedEmail,
+                teamName: team.teamName,
+            },
+        },
+    });
+});
+
+const markTeamWaiting = asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    if (!req.user || req.user.role !== "TEAM" || !req.user.teamId) {
+        return res.status(403).json({ success: false, message: "Only team accounts can mark waiting status" });
+    }
+
+    const team = await Team.findById(req.user.teamId).select("teamName teamMembers").lean();
+    if (!team) {
+        return res.status(404).json({ success: false, message: "Team not found" });
+    }
+
+    await WaitingPresence.findOneAndUpdate(
+        { teamId: team._id },
+        {
+            teamId: team._id,
+            teamName: team.teamName,
+            members: team.teamMembers,
+            lastSeenAt: new Date(),
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    const activeTeams = await getActiveWaitingTeams();
+    return res.status(200).json({
+        success: true,
+        message: "Waiting status updated",
+        data: {
+            waitingCount: activeTeams.length,
+        },
+    });
+});
+
+const getWaitingRoomCount = asyncHandler(async (req: Request, res: Response) => {
+    const activeTeams = await getActiveWaitingTeams();
+    return res.status(200).json({
+        success: true,
+        message: "Waiting room count fetched",
+        data: {
+            waitingCount: activeTeams.length,
+        },
+    });
+});
+
+const getWaitingRoomSnapshot = asyncHandler(async (req: Request, res: Response) => {
+    const activeTeams = await getActiveWaitingTeams();
+    return res.status(200).json({
+        success: true,
+        message: "Waiting room snapshot fetched",
+        data: {
+            waitingCount: activeTeams.length,
+            teams: activeTeams,
+        },
     });
 });
 
@@ -153,4 +293,15 @@ const deletePenalty = asyncHandler(async (req: Request, res: Response) => {
     });
 });
 
-export { getTeams, getBannedTeams, updateTeamStatus, penalizeTeams, getPenalizedTeams, deletePenalty };
+export {
+    getTeams,
+    getBannedTeams,
+    updateTeamStatus,
+    penalizeTeams,
+    getPenalizedTeams,
+    deletePenalty,
+    createTeamByAdmin,
+    markTeamWaiting,
+    getWaitingRoomCount,
+    getWaitingRoomSnapshot,
+};

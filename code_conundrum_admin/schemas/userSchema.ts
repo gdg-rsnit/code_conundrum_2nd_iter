@@ -34,10 +34,9 @@ export const deleteUserResponseSchema = z.object({
 
 export const loginUserSchema = z.object({
   email: z
-  .email("Invalid email address")
-  .trim()
-  .toLowerCase()
-  .min(1, "Email or team name is required"),
+    .string()
+    .min(1, "Email or team name is required")
+    .transform((value) => value.trim().toLowerCase()),
   password: z.string().min(1, "Password is required"),
 });
 

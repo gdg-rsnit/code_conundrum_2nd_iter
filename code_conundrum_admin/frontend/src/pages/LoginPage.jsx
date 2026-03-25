@@ -94,8 +94,8 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-2">
           <input
             className="input"
-            type="email"
-            placeholder="Email"
+            type="text"
+            placeholder="Email or Team Name"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required

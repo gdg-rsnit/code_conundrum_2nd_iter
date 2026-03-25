@@ -25,8 +25,10 @@ const WaitingRoom = () => {
   const navigate = useNavigate();
   const [flashing, setFlashing] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
+  const [waitingCount, setWaitingCount] = useState(0);
   const hasNavigatedRef = useRef(false);
   const bannedBlockedRef = useRef(false);
+  const lastHeartbeatRef = useRef(0);
 
   useEffect(() => {
     const handleGlobalClick = (e: MouseEvent) => {
@@ -56,9 +58,32 @@ const WaitingRoom = () => {
   const [nextRoundNumber, setNextRoundNumber] = useState<number>(Number(team.round) || 1);
 
   useEffect(() => {
+    const sendWaitingHeartbeat = async () => {
+      const now = Date.now();
+      if (now - lastHeartbeatRef.current < 2000) return;
+      lastHeartbeatRef.current = now;
+
+      try {
+        const response = await fetch(`${API_URL}/admin/teams/waiting-room/heartbeat`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+
+        if (response.ok) {
+          const heartbeatData = await response.json().catch(() => ({}));
+          const count = Number(heartbeatData?.data?.waitingCount || 0);
+          setWaitingCount(count);
+        }
+      } catch {
+        // Ignore heartbeat failures to avoid disrupting round polling.
+      }
+    };
+
     const checkLiveRound = async () => {
       if (hasNavigatedRef.current) return;
       if (bannedBlockedRef.current) return;
+
+      await sendWaitingHeartbeat();
 
       try {
         const response = await fetch(`${API_URL}/admin/round`, { credentials: 'include' });
@@ -222,6 +247,9 @@ const WaitingRoom = () => {
             </span>
             <span className="font-pixel text-[8px] px-[14px] py-2 bg-space-navy border-2 border-[#22C55E] text-[#22C55E]">
               STATUS: READY
+            </span>
+            <span className="font-pixel text-[8px] px-[14px] py-2 bg-space-navy border-2 border-cyan-400 text-cyan-300">
+              WAITING: {waitingCount}
             </span>
           </div>
 
